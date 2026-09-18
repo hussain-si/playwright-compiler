@@ -1,0 +1,2087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playwright Playground — run tests against a simulated browser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1a1826; --panel:#221f31; --panel2:#2b2740; --line:#393352;
+  --text:#e9e5f5; --muted:#9d97b8; --dim:#6f6890;
+  --amber:#f2a03d; --mint:#4fd1a5; --rose:#ff6b7a; --iris:#8f7cf5;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  --ui:'Space Grotesk',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--ink);color:var(--text);font-family:var(--ui);
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--iris);outline-offset:2px}
+
+/* ---------- shell ---------- */
+.app{display:flex;flex-direction:column;height:100%}
+.bar{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--panel);
+  border-bottom:1px solid var(--line);flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:9px;margin-right:4px}
+.brand b{font-weight:700;letter-spacing:-.02em;font-size:15px}
+.brand span{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.spacer{flex:1}
+.btn{padding:6px 13px;border-radius:7px;background:var(--panel2);border:1px solid var(--line);
+  font-weight:500;transition:background .12s,border-color .12s}
+.btn:hover{background:#332e4c}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn.run{background:var(--mint);color:#10261e;border-color:transparent;font-weight:700}
+.btn.run:hover{background:#63e0b6}
+.btn.stop{background:var(--rose);color:#2b0d12;border-color:transparent;font-weight:700}
+select{background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  padding:6px 9px;border-radius:7px;font-family:inherit}
+.speed{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.speed input{accent-color:var(--iris);width:82px}
+
+.mobtabs{display:none;gap:5px;padding:7px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+.mobtabs button{flex:1;padding:8px 4px;border-radius:8px;background:var(--panel2);
+  border:1px solid var(--line);font-size:12.5px;font-weight:500}
+.mobtabs button.on{background:var(--iris);border-color:transparent;color:#fff;font-weight:700}
+.browser{display:flex;flex-direction:column;flex:1;min-height:0}
+.main{flex:1;display:flex;min-height:0}
+.left{width:44%;min-width:300px;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.right{flex:1;display:flex;flex-direction:column;min-width:0}
+.hdr{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--panel);
+  border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);flex:none}
+.hdr .tab{padding:3px 9px;border-radius:6px}
+.hdr .tab.on{background:var(--panel2);color:var(--text)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--dim)}
+.dot.live{background:var(--mint);box-shadow:0 0 0 3px rgba(79,209,165,.16)}
+.dot.busy{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+
+/* ---------- editor ---------- */
+.ed{flex:1;position:relative;display:flex;overflow:hidden;background:#1d1a2b}
+.codewrap{position:relative;flex:1;overflow-y:auto;overflow-x:hidden}
+.codewrap pre,.codewrap textarea{margin:0;padding:14px 16px 52px;font-family:var(--mono);
+  font-size:12.5px;line-height:1.75;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;
+  border:0;tab-size:2;letter-spacing:0}
+.codewrap pre{pointer-events:none;color:var(--text);min-height:100%}
+.codewrap textarea{position:absolute;top:0;left:0;width:100%;background:transparent;
+  color:transparent;caret-color:var(--amber);resize:none;overflow:hidden;outline:none}
+.t-key{color:#c792ea}.t-str{color:#c3e88d}.t-com{color:#5b5478;font-style:italic}
+.t-num{color:#f78c6c}.t-fn{color:#82aaff}.t-glob{color:#ffcb6b;font-weight:500}
+
+/* ---------- browser ---------- */
+.chrome{background:var(--panel);border-bottom:1px solid var(--line);padding:8px 12px;
+  display:flex;align-items:center;gap:10px;flex:none}
+.lights{display:flex;gap:6px}
+.lights i{width:11px;height:11px;border-radius:50%;display:block}
+.url{flex:1;background:#171522;border:1px solid var(--line);border-radius:20px;padding:5px 14px;
+  font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.stage{flex:1;position:relative;overflow:auto;background:#f6f5fb}
+#page{min-height:100%;font-family:var(--ui);color:#211f2e}
+.snapbar{display:none;align-items:center;gap:10px;padding:6px 12px;background:var(--amber);
+  color:#33210a;font-size:12px;font-weight:500;flex:none}
+.snapbar.on{display:flex}
+.snapbar button{background:#33210a;color:#f7dcb4;padding:2px 9px;border-radius:5px;font-size:11px}
+
+/* pick + inspect */
+.chrome select{max-width:118px;font-family:var(--mono);font-size:11.5px;padding:5px 7px}
+.btn.pick{padding:5px 10px;font-size:12px;white-space:nowrap}
+.btn.pick.on{background:var(--amber);color:#33210a;border-color:transparent;font-weight:700}
+#page.picking,#page.picking *{cursor:crosshair !important}
+#matches{position:absolute;inset:0;pointer-events:none;z-index:35}
+#matches i{position:absolute;border:2px solid var(--iris);border-radius:3px;
+  background:rgba(143,124,245,.14);display:block}
+#matches i b{position:absolute;top:-8px;left:-8px;background:var(--iris);color:#fff;
+  font-family:var(--mono);font-size:9px;line-height:15px;width:16px;height:16px;
+  border-radius:50%;text-align:center;font-weight:700}
+
+.tester{display:flex;flex-direction:column;gap:6px;padding:10px 14px 8px;
+  border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:2}
+.tester input{background:#171522;border:1px solid var(--line);border-radius:8px;
+  padding:8px 11px;color:var(--text);font-family:var(--mono);font-size:12px;width:100%}
+.tester input:focus{outline:2px solid var(--iris);outline-offset:-1px}
+.tres{font-family:var(--mono);font-size:11.5px;color:var(--dim);white-space:pre-wrap}
+.tres.ok{color:var(--mint)}.tres.warn{color:var(--amber)}.tres.bad{color:var(--rose)}
+.elchip{margin:10px 14px 4px;font-family:var(--mono);font-size:11.5px;color:var(--muted);
+  background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;
+  overflow-wrap:anywhere}
+.elchip b{color:var(--amber)}
+.cands{padding:4px 0 10px}
+.cand{display:flex;align-items:center;gap:8px;padding:6px 14px;border-left:2px solid transparent}
+.cand:hover{background:var(--panel2)}
+.cand code{font-family:var(--mono);font-size:11.5px;color:var(--text);flex:1;
+  overflow-wrap:anywhere;min-width:0}
+.cand .n{font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:10px;flex:none;
+  background:rgba(79,209,165,.15);color:var(--mint)}
+.cand .n.many{background:rgba(242,160,61,.15);color:var(--amber)}
+.cand .n.none{background:rgba(255,107,122,.15);color:var(--rose)}
+.cand button{flex:none;font-size:10.5px;padding:3px 8px;border-radius:6px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.cand button:hover{color:var(--text);border-color:var(--iris)}
+.cand.best{border-left-color:var(--mint)}
+.grp{padding:12px 14px 3px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+
+/* overlays */
+.dialogbar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:60;
+  max-width:88%;background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:9px;padding:9px 13px;font-size:12.5px;display:flex;gap:9px;align-items:baseline;
+  box-shadow:0 8px 24px rgba(10,8,18,.35)}
+.dialogbar b{font-family:var(--mono);font-size:10.5px;color:var(--amber)}
+#ring{position:absolute;border:2px solid var(--amber);border-radius:4px;pointer-events:none;
+  opacity:0;transition:all .16s cubic-bezier(.2,.7,.3,1);box-shadow:0 0 0 9999px rgba(26,24,38,.28);z-index:40}
+#ring.on{opacity:1}
+#ring b{position:absolute;top:-21px;left:-2px;background:var(--amber);color:#33210a;
+  font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:4px;white-space:nowrap;font-weight:700}
+#cursor{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;
+  background:rgba(242,160,61,.35);border:2px solid var(--amber);pointer-events:none;opacity:0;
+  transition:all .22s cubic-bezier(.3,.8,.3,1);z-index:41}
+#cursor.on{opacity:1}
+#cursor.tap{transform:scale(.55);background:rgba(242,160,61,.85)}
+
+/* ---------- output ---------- */
+.out{height:36%;min-height:120px;display:flex;flex-direction:column;border-top:1px solid var(--line);
+  background:var(--panel)}
+.outbody{flex:1;overflow:auto;padding:8px 0}
+.log{font-family:var(--mono);font-size:12px;padding:2px 14px;white-space:pre-wrap;word-break:break-word}
+.log.err{color:var(--rose)}.log.ok{color:var(--mint)}.log.info{color:var(--muted)}
+.step{display:flex;align-items:baseline;gap:9px;padding:5px 14px;font-family:var(--mono);font-size:11.5px;line-height:1.5;
+  cursor:pointer;border-left:2px solid transparent}
+.step:hover{background:var(--panel2)}
+.step.sel{background:var(--panel2);border-left-color:var(--amber)}
+.step .ic{flex:none;width:14px;text-align:center}
+.step.pass .ic{color:var(--mint)}.step.fail .ic{color:var(--rose)}.step.run .ic{color:var(--amber)}
+.step .nm{color:var(--text);flex:none}
+.step .ar{color:var(--dim);flex:1;min-width:0;overflow-wrap:anywhere}
+.step .ms{color:var(--dim);flex:none;margin-left:auto;padding-left:8px}
+.empty{padding:20px 16px;color:var(--dim);font-size:12.5px;max-width:52ch}
+.empty code{font-family:var(--mono);color:var(--muted)}
+.summary{padding:7px 14px;font-family:var(--mono);font-size:12px;border-top:1px solid var(--line);flex:none}
+
+/* ---------- simulated sites ---------- */
+#page .s-nav{display:flex;align-items:center;justify-content:space-between;padding:13px 22px;
+  background:#fff;border-bottom:1px solid #e2dfee}
+#page .s-logo{font-weight:700;letter-spacing:-.02em;color:#4b3fa8}
+#page .s-nav a{margin-left:16px;color:#5c5878;text-decoration:none;font-size:13px}
+#page .s-main{padding:26px 22px;max-width:640px;margin:0 auto}
+#page .s-card{background:#fff;border:1px solid #e2dfee;border-radius:12px;padding:22px}
+#page h1{font-size:21px;margin:0 0 4px;letter-spacing:-.02em}
+#page .s-sub{margin:0 0 18px;color:#6f6b8a;font-size:13px}
+#page .s-sub code{font-family:var(--mono);background:#f0eefa;padding:1px 5px;border-radius:4px}
+#page label{display:block;font-size:12px;color:#5c5878;margin:12px 0 5px}
+#page input[type=text],#page input[type=password],#page input[type=search],#page input:not([type]){
+  width:100%;padding:9px 11px;border:1px solid #d7d3e8;border-radius:8px;font-size:14px;
+  font-family:inherit;background:#fdfdff}
+#page input:focus{outline:2px solid #8f7cf5;outline-offset:-1px;border-color:transparent}
+#page button{background:#4b3fa8;color:#fff;padding:9px 16px;border-radius:8px;font-weight:500;
+  font-family:inherit;font-size:13px;margin-top:16px}
+#page button:hover{background:#5b4dc4}
+#page .s-check{display:flex;align-items:center;gap:7px;font-size:13px;color:#5c5878;margin-top:14px}
+#page .s-check input{width:auto;margin:0}
+#page .s-flash{margin-top:16px;padding:10px 12px;border-radius:8px;font-size:13px}
+#page .s-flash.ok{background:#e4f8f0;color:#186a4c;border:1px solid #b6ead6}
+#page .s-flash.bad{background:#fdeaec;color:#992633;border:1px solid #f6c6cc}
+#page .s-spin{margin-top:16px;font-size:13px;color:#6f6b8a}
+#page .s-list{list-style:none;margin:16px 0 0;padding:0;border-top:1px solid #ece9f7}
+#page .s-item{display:flex;align-items:center;gap:11px;padding:10px 2px;border-bottom:1px solid #ece9f7}
+#page .s-item input{width:auto}
+#page .s-item.done .s-text{text-decoration:line-through;color:#a7a3bd}
+#page .s-text{flex:1;font-size:14px}
+#page .s-del{background:none;color:#b9b4cf;margin:0;padding:2px 6px;font-size:14px}
+#page .s-del:hover{background:none;color:#d94f60}
+#page .s-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:14px;font-size:12px;color:#6f6b8a;flex-wrap:wrap}
+#page .s-filters{display:flex;gap:5px}
+#page .s-filters button,#page .s-foot .s-clear{margin:0;padding:4px 10px;background:#f0eefa;color:#5c5878;
+  border-radius:6px;font-size:12px}
+#page .s-filters button.active{background:#4b3fa8;color:#fff}
+#page .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:16px}
+#page .prod{border:1px solid #e2dfee;border-radius:10px;padding:13px;background:#fff}
+#page .prod .th{height:56px;border-radius:7px;margin-bottom:10px}
+#page .prod h3{margin:0;font-size:14px;letter-spacing:-.01em}
+#page .prod .pr{color:#4b3fa8;font-weight:700;font-size:14px;margin:3px 0 0}
+#page .prod button{width:100%;margin-top:10px;padding:7px}
+#page .cart{background:#4b3fa8;color:#fff;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600}
+#page .s-empty{padding:22px;text-align:center;color:#8f8ba8;font-size:13px}
+
+
+/* --- form elements page --- */
+#page .wide{max-width:760px}
+#page fieldset{border:1px solid #e2dfee;border-radius:10px;padding:12px 16px 18px;margin:0 0 14px}
+#page legend{font-size:12px;color:#4b3fa8;font-weight:600;padding:0 6px}
+#page .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#page textarea,#page select,#page input[type=date],#page input[type=time],
+#page input[type=number],#page input[type=email],#page input[type=file]{
+  width:100%;padding:9px 11px;border:1px solid #d7d3e8;border-radius:8px;
+  font-family:inherit;font-size:14px;background:#fdfdff;color:#211f2e}
+#page textarea{min-height:72px;resize:vertical}
+#page select[multiple]{min-height:96px}
+#page input[type=range]{width:100%;accent-color:#4b3fa8;margin-top:6px}
+#page input[type=color]{width:56px;height:36px;padding:2px;border:1px solid #d7d3e8;border-radius:8px;background:#fff}
+#page .s-radio{display:flex;align-items:center;gap:8px;font-size:13px;color:#3c3956;margin:9px 0 0}
+#page .s-radio input,#page .s-check input{width:auto;margin:0}
+#page :disabled,#page [readonly]{background:#f2f1f7;color:#a09cb6}
+#page .btnrow{display:flex;gap:10px}
+#page .ghost{background:#f0eefa;color:#4b3fa8}
+#page .ghost:hover{background:#e5e1f7}
+#page .hint{font-size:11.5px;color:#8f8ba8;margin:5px 0 0}
+
+/* --- tables --- */
+#page table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
+#page th,#page td{text-align:left;padding:9px 10px;border-bottom:1px solid #ece9f7}
+#page thead th{color:#4b3fa8;font-size:12px;cursor:pointer;user-select:none;white-space:nowrap}
+#page thead th.asc::after{content:' ↑'}
+#page thead th.desc::after{content:' ↓'}
+#page tbody tr:hover{background:#faf9fe}
+#page .kv th{color:#6f6b8a;cursor:default;width:38%;font-weight:500}
+#page td button,#page .pager button,#page .tabs button,#page .acc-head,
+#page .widget button,#page .frame button{margin-top:0}
+#page td button{background:#f7eaec;color:#a33245;padding:4px 9px;font-size:12px}
+#page td button:hover{background:#f3d9dd}
+#page .pager{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:#6f6b8a}
+#page .pager button{padding:5px 11px;background:#f0eefa;color:#4b3fa8;font-size:12px}
+#page .pager button:disabled{opacity:.45}
+
+/* --- widgets --- */
+#page .widget{border:1px solid #e2dfee;border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff}
+#page .widget h2{font-size:13px;margin:0 0 10px;color:#4b3fa8;letter-spacing:-.01em}
+#page .tabs{display:flex;gap:4px;border-bottom:1px solid #e2dfee}
+#page .tabs button{background:none;color:#6f6b8a;border-radius:8px 8px 0 0;padding:8px 13px;font-size:13px}
+#page .tabs button[aria-selected=true]{background:#f0eefa;color:#4b3fa8;font-weight:600}
+#page .panel{padding:12px 2px;font-size:13px;color:#4a4766}
+#page .acc-head{width:100%;text-align:left;background:#f7f6fc;color:#3c3956;padding:9px 12px;
+  border-radius:8px;font-size:13px;font-weight:500;margin-bottom:6px}
+#page .acc-body{padding:2px 12px 12px;font-size:13px;color:#4a4766}
+#page .tool{position:relative;display:inline-block}
+#page .tip{position:absolute;bottom:calc(100% + 7px);left:0;background:#2b2740;color:#fff;
+  font-size:12px;padding:5px 9px;border-radius:6px;white-space:nowrap}
+#page .scrim{position:absolute;inset:0;background:rgba(33,31,46,.45);display:flex;
+  align-items:center;justify-content:center;z-index:9}
+#page .modal{background:#fff;border-radius:12px;padding:20px;max-width:330px;width:86%}
+#page .modal h2{font-size:16px;color:#211f2e;margin:0 0 6px}
+#page .modal p{font-size:13px;color:#5c5878;margin:0}
+#page .toast{position:absolute;right:14px;bottom:14px;background:#186a4c;color:#fff;
+  padding:9px 14px;border-radius:8px;font-size:13px;z-index:8}
+#page .drag{display:flex;gap:12px;align-items:stretch}
+#page .box{background:#4b3fa8;color:#fff;border-radius:9px;padding:16px;font-size:13px;
+  font-weight:600;cursor:grab;flex:none}
+#page .zone{flex:1;border:2px dashed #c9c3e6;border-radius:9px;padding:16px;font-size:13px;
+  color:#8f8ba8;text-align:center}
+#page .zone.over{border-color:#4b3fa8;background:#f5f3fd}
+#page .frame{border:1px solid #d7d3e8;border-radius:10px;overflow:hidden;margin-top:4px}
+#page .frame-bar{background:#f2f1f8;padding:5px 11px;font-size:11px;color:#8f8ba8;
+  font-family:var(--mono);border-bottom:1px solid #e2dfee}
+#page .frame-body{padding:14px;background:#fff}
+#page .spin{display:inline-block;width:14px;height:14px;border:2px solid #d7d3e8;
+  border-top-color:#4b3fa8;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+#page .stat{font-size:13px;color:#4a4766;margin:10px 0 0}
+#page .stage-rel{position:relative}
+
+@media (max-width:860px){
+  .mobtabs{display:flex}
+  .main{flex-direction:column}
+  .right{display:contents}
+  .left,.browser,.out{display:none;width:auto;min-width:0;height:auto;flex:1;
+    border-right:0;border-top:0;min-height:0}
+  body[data-panel=code] .left{display:flex}
+  body[data-panel=page] .browser{display:flex}
+  body[data-panel=out]  .out{display:flex}
+  .bar{padding:8px 10px;gap:8px}
+  .brand span{display:none}
+  .brand b{font-size:14px}
+  #examples{flex:1;min-width:0;max-width:100%}
+  .speed{order:5}
+  .speed input{width:70px}
+  #edhint{display:none}
+  .url{display:none}
+  .chrome select{max-width:none;flex:1}
+  .codewrap pre,.codewrap textarea{font-size:13px;padding:14px 14px 60px}
+}
+@media (max-width:420px){
+  .btn{padding:6px 10px}
+  .bar{gap:6px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar">
+    <div class="brand"><b>Playwright Playground</b><span>simulated runtime</span></div>
+    <select id="examples" title="Load an example">
+      <option value="login">Example: login flow</option>
+      <option value="todo">Example: todo app</option>
+      <option value="shop">Example: shop + assertions</option>
+      <option value="elements">Example: every form element</option>
+      <option value="widgets">Example: tabs, modal, drag, toast</option>
+      <option value="advanced">Example: dialogs, frame, shadow DOM</option>
+      <option value="table">Example: sortable table</option>
+      <option value="wait">Example: auto-waiting</option>
+      <option value="fail">Example: a failing test</option>
+    </select>
+    <div class="spacer"></div>
+    <label class="speed">Speed
+      <input id="speed" type="range" min="0" max="800" step="50" value="350">
+      <span id="speedv" style="font-family:var(--mono);width:44px">350ms</span>
+    </label>
+    <button class="btn" id="reset">Reset page</button>
+    <button class="btn run" id="run">Run test</button>
+  </div>
+
+  <div class="mobtabs" id="mobtabs">
+    <button data-panel="code" class="on">Code</button>
+    <button data-panel="page">Browser</button>
+    <button data-panel="out">Trace</button>
+  </div>
+
+  <div class="main">
+    <div class="left">
+      <div class="hdr"><span id="fname">login.spec.js</span><span class="spacer"></span><span id="edhint" style="font-family:var(--mono);font-size:11px">Ctrl+Enter to run</span></div>
+      <div class="ed">
+        <div class="codewrap" id="codewrap">
+          <pre><code id="hl"></code></pre>
+          <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <section class="browser">
+      <div class="chrome">
+        <div class="lights"><i style="background:#ff6b7a"></i><i style="background:#f2a03d"></i><i style="background:#4fd1a5"></i></div>
+        <div class="url" id="url">about:blank</div>
+        <select id="route" title="Navigate to a demo page">
+          <option value="/login">/login</option>
+          <option value="/todo">/todo</option>
+          <option value="/shop">/shop</option>
+          <option value="/elements">/elements</option>
+          <option value="/widgets">/widgets</option>
+          <option value="/table">/table</option>
+        </select>
+        <button class="btn pick" id="pick" title="Click an element in the page to get its locators">⌖ Pick</button>
+        <span class="dot" id="pagedot"></span>
+      </div>
+      <div class="snapbar" id="snapbar">
+        <span id="snaptext">Viewing a snapshot from an earlier step</span>
+        <button id="golive">Back to live page</button>
+      </div>
+      <div class="stage" id="stage">
+        <div id="page"></div>
+        <div id="matches"></div>
+        <div id="ring"><b></b></div>
+        <div id="cursor"></div>
+      </div>
+      </section>
+
+      <div class="out">
+        <div class="hdr">
+          <span class="tab on" data-tab="trace">Trace</span>
+          <span class="tab" data-tab="console">Console</span>
+          <span class="tab" data-tab="inspect">Inspect</span>
+          <span class="spacer"></span>
+          <button class="btn" id="clear" style="padding:2px 9px;font-size:11px">Clear</button>
+        </div>
+        <div class="outbody" id="traceBody">
+          <div class="empty">Every action lands here as a step, with the locator it used and how long it took. Click any step to jump the page back to how it looked at that moment.</div>
+        </div>
+        <div class="outbody" id="consoleBody" style="display:none">
+          <div class="empty">Output from <code>console.log</code> in your test appears here.</div>
+        </div>
+        <div class="outbody" id="inspectBody" style="display:none">
+          <div class="tester">
+            <input id="testerInput" spellcheck="false" autocapitalize="off" autocomplete="off"
+              placeholder="Test any locator: #username  ·  //button[@id='login']  ·  getByRole('button', { name: 'Log in' })">
+            <span class="tres" id="testerOut">Matches are outlined in the page as you type.</span>
+          </div>
+          <div id="inspectOut"><div class="empty">Hit <code>⌖ Pick</code> above the page, then click any element — you'll get its test id, role, label, CSS and XPath locators, each with a live match count. Or navigate with the route dropdown and explore by hand.</div></div>
+        </div>
+        <div class="summary" id="summary" style="color:var(--dim)">Ready.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   A note on what this is:
+   Real Playwright drives real browser binaries over CDP from
+   Node. None of that can exist in a web page. So this file
+   reimplements the Playwright *API surface* — locators, auto
+   waiting, actionability, assertions, traces — and runs it
+   against simulated sites rendered in the panel on the right.
+   The semantics are modelled closely; the browser is fake.
+   ============================================================ */
+const $ = (s, r=document) => r.querySelector(s);
+const sleepRaw = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------------- simulated sites ---------------- */
+const SITES = {
+  '/login': {
+    title: 'Sign in · Acme',
+    html: `
+      <header class="s-nav"><span class="s-logo">Acme</span>
+        <nav><a href="/login" data-testid="nav-home">Home</a><a href="/shop">Shop</a><a href="/todo">Tasks</a></nav></header>
+      <main class="s-main"><div class="s-card">
+        <h1>Sign in</h1>
+        <p class="s-sub">Try <code>admin</code> and <code>secret123</code>.</p>
+        <label for="username">Username</label>
+        <input id="username" name="username" placeholder="Enter username">
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password" placeholder="Enter password">
+        <label class="s-check"><input type="checkbox" id="remember"> Remember me</label>
+        <button id="login" data-testid="login-button">Log in</button>
+        <div class="s-flash" data-testid="flash" hidden></div>
+      </div></main>`,
+    init(root){
+      const btn = $('#login', root), flash = $('[data-testid=flash]', root);
+      btn.addEventListener('click', () => {
+        const u = $('#username', root).value.trim(), p = $('#password', root).value;
+        flash.hidden = false; flash.className = 's-flash'; flash.textContent = 'Checking credentials…';
+        setTimeout(() => {                       // deliberate 700ms delay: auto-waiting has to earn its keep
+          if (u === 'admin' && p === 'secret123') {
+            $('.s-card', root).innerHTML =
+              `<h1 data-testid="welcome">Welcome back, admin</h1>
+               <p class="s-sub">You are signed in to the secure area.</p>
+               <div class="s-flash ok" data-testid="flash">Signed in successfully</div>
+               <button id="logout">Log out</button>`;
+          } else {
+            flash.className = 's-flash bad';
+            flash.textContent = u ? 'Those credentials are not valid' : 'Enter a username to continue';
+          }
+        }, 700);
+      });
+    }
+  },
+
+  '/todo': {
+    title: 'Tasks',
+    html: `
+      <header class="s-nav"><span class="s-logo">Tasks</span>
+        <nav><a href="/login">Sign in</a><a href="/shop">Shop</a></nav></header>
+      <main class="s-main"><div class="s-card">
+        <h1>Today</h1>
+        <p class="s-sub">Type a task and press Enter.</p>
+        <input id="new-todo" data-testid="new-todo" placeholder="What needs doing?">
+        <ul class="s-list" data-testid="todo-list"></ul>
+        <div class="s-foot">
+          <span data-testid="todo-count">0 tasks left</span>
+          <div class="s-filters">
+            <button data-filter="all" class="active">All</button>
+            <button data-filter="active">Active</button>
+            <button data-filter="done">Done</button>
+          </div>
+          <button class="s-clear" data-testid="clear-done">Clear done</button>
+        </div>
+      </div></main>`,
+    init(root){
+      let items = [], filter = 'all';
+      const list = $('[data-testid=todo-list]', root), inp = $('#new-todo', root);
+      function render(){
+        const shown = items.filter(i => filter === 'all' || (filter === 'done') === i.done);
+        list.innerHTML = shown.length ? shown.map(i => `
+          <li class="s-item ${i.done?'done':''}" data-testid="todo-item">
+            <input type="checkbox" data-id="${i.id}" aria-label="Toggle ${i.text}" ${i.done?'checked':''}>
+            <span class="s-text">${i.text}</span>
+            <button class="s-del" data-id="${i.id}" aria-label="Delete ${i.text}">✕</button>
+          </li>`).join('') : `<li class="s-empty">Nothing here yet</li>`;
+        const left = items.filter(i => !i.done).length;
+        $('[data-testid=todo-count]', root).textContent = `${left} task${left===1?'':'s'} left`;
+      }
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && inp.value.trim()) {
+          items.push({id: Date.now()+Math.random(), text: inp.value.trim(), done: false});
+          inp.value = ''; render();
+        }
+      });
+      list.addEventListener('click', e => {
+        const id = e.target.dataset.id; if (!id) return;
+        if (e.target.type === 'checkbox') items.find(i => String(i.id) === id).done = e.target.checked;
+        else items = items.filter(i => String(i.id) !== id);
+        render();
+      });
+      root.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
+        filter = b.dataset.filter;
+        root.querySelectorAll('[data-filter]').forEach(x => x.classList.toggle('active', x === b));
+        render();
+      }));
+      $('[data-testid=clear-done]', root).addEventListener('click', () => {
+        items = items.filter(i => !i.done); render();
+      });
+      render();
+    }
+  },
+
+  '/shop': {
+    title: 'Shop · Acme',
+    html: `
+      <header class="s-nav"><span class="s-logo">Acme</span>
+        <span class="cart" data-testid="cart-count">Cart: 0</span></header>
+      <main class="s-main"><div class="s-card">
+        <h1>Keyboards</h1>
+        <p class="s-sub">Filter the list, then add something to the cart.</p>
+        <input type="search" id="search" placeholder="Search products">
+        <div class="grid" data-testid="grid"></div>
+      </div></main>`,
+    init(root){
+      const P = [
+        {n:'Nomad 60', p:129, c:'#ffd7a8'}, {n:'Nomad 87', p:159, c:'#c9e8ff'},
+        {n:'Field Pro', p:219, c:'#d6ffe4'}, {n:'Field Mini', p:99, c:'#f0d9ff'}
+      ];
+      let cart = 0;
+      const grid = $('[data-testid=grid]', root);
+      function render(q=''){
+        const list = P.filter(x => x.n.toLowerCase().includes(q.toLowerCase()));
+        grid.innerHTML = list.length ? list.map(x => `
+          <article class="prod" data-testid="product">
+            <div class="th" style="background:${x.c}"></div>
+            <h3>${x.n}</h3><p class="pr">$${x.p}</p>
+            <button data-name="${x.n}">Add to cart</button>
+          </article>`).join('') : `<p class="s-empty">No products match that search</p>`;
+      }
+      grid.addEventListener('click', e => {
+        if (e.target.dataset.name) {
+          cart++; $('[data-testid=cart-count]', root).textContent = `Cart: ${cart}`;
+          e.target.textContent = 'Added';
+          setTimeout(() => e.target.textContent = 'Add to cart', 900);
+        }
+      });
+      $('#search', root).addEventListener('input', e => render(e.target.value));
+      render();
+    }
+  },
+
+  '/elements': {
+    title: 'Form elements',
+    html: `
+      <header class="s-nav"><span class="s-logo">Acme</span>
+        <nav><a href="/widgets">Widgets</a><a href="/table">Table</a><a href="/login">Sign in</a></nav></header>
+      <main class="s-main wide"><div class="s-card">
+        <h1>Form elements</h1>
+        <p class="s-sub">One of every control, so you can practise every action.</p>
+
+        <fieldset><legend>Text</legend>
+          <div class="row2">
+            <div><label for="first-name">First name</label>
+              <input id="first-name" name="firstName" placeholder="Ada"></div>
+            <div><label for="email">Email</label>
+              <input id="email" type="email" placeholder="you@example.com"></div>
+          </div>
+          <div class="row2">
+            <div><label for="password">Password</label>
+              <input id="password" type="password" placeholder="••••••••"></div>
+            <div><label for="quantity">Quantity</label>
+              <input id="quantity" type="number" min="1" max="99" value="1"></div>
+          </div>
+          <label for="bio">About you</label>
+          <textarea id="bio" placeholder="A few words"></textarea>
+          <div class="row2">
+            <div><label for="readonly-field">Account ID (read only)</label>
+              <input id="readonly-field" value="ACC-4417" readonly></div>
+            <div><label for="disabled-field">Legacy code (disabled)</label>
+              <input id="disabled-field" value="not editable" disabled></div>
+          </div>
+        </fieldset>
+
+        <fieldset><legend>Choices</legend>
+          <p class="hint">Plan</p>
+          <label class="s-radio"><input type="radio" name="plan" value="Free" checked> Free</label>
+          <label class="s-radio"><input type="radio" name="plan" value="Pro"> Pro</label>
+          <label class="s-radio"><input type="radio" name="plan" value="Team"> Team</label>
+          <label class="s-check"><input type="checkbox" id="newsletter"> Subscribe to the newsletter</label>
+          <label class="s-check"><input type="checkbox" id="terms"> Accept the terms</label>
+          <label class="s-check"><input type="checkbox" id="dark" role="switch"> Dark mode</label>
+        </fieldset>
+
+        <fieldset><legend>Selects</legend>
+          <div class="row2">
+            <div><label for="country">Country</label>
+              <select id="country">
+                <option value="">Choose a country</option>
+                <option>Brazil</option><option>Germany</option>
+                <option>India</option><option>Japan</option>
+              </select></div>
+            <div><label for="skills">Skills</label>
+              <select id="skills" multiple>
+                <option>Playwright</option><option>Cypress</option>
+                <option>Selenium</option><option>Puppeteer</option>
+              </select></div>
+          </div>
+        </fieldset>
+
+        <fieldset><legend>Ranges and pickers</legend>
+          <label for="volume">Volume</label>
+          <input id="volume" type="range" min="0" max="100" value="50">
+          <p class="hint" data-testid="volume-value">50</p>
+          <div class="row2">
+            <div><label for="start-date">Start date</label><input id="start-date" type="date"></div>
+            <div><label for="start-time">Start time</label><input id="start-time" type="time"></div>
+          </div>
+          <label for="theme-color">Accent colour</label>
+          <input id="theme-color" type="color" value="#4b3fa8">
+        </fieldset>
+
+        <fieldset><legend>Upload</legend>
+          <label for="resume">Resume</label>
+          <input id="resume" type="file">
+          <p class="hint" data-testid="file-name">No file chosen</p>
+        </fieldset>
+
+        <div class="btnrow">
+          <button id="submit" data-testid="submit">Submit</button>
+          <button id="clear" class="ghost" type="button">Clear form</button>
+        </div>
+        <div data-testid="result" hidden></div>
+      </div></main>`,
+    init(root){
+      const g = id => $('#' + id, root);
+      g('volume').addEventListener('input', e =>
+        $('[data-testid=volume-value]', root).textContent = e.target.value);
+      g('resume').addEventListener('change', e => {
+        const f = e.target.files && e.target.files[0];
+        $('[data-testid=file-name]', root).textContent =
+          f ? f.name : (e.target.dataset.files || 'No file chosen');
+      });
+      g('clear').addEventListener('click', () => loadSite('/elements'));
+      g('submit').addEventListener('click', () => {
+        const plan = [...root.querySelectorAll('input[name=plan]')].find(r => r.checked);
+        const skills = [...g('skills').selectedOptions].map(o => o.textContent).join(', ');
+        const rows = [
+          ['name', g('first-name').value], ['email', g('email').value],
+          ['quantity', g('quantity').value], ['bio', g('bio').value],
+          ['plan', plan ? plan.value : ''], ['newsletter', g('newsletter').checked ? 'yes' : 'no'],
+          ['dark-mode', g('dark').checked ? 'on' : 'off'],
+          ['country', g('country').value], ['skills', skills],
+          ['volume', g('volume').value], ['start-date', g('start-date').value],
+          ['colour', g('theme-color').value],
+          ['resume', $('[data-testid=file-name]', root).textContent]
+        ];
+        const res = $('[data-testid=result]', root);
+        res.hidden = false;
+        res.innerHTML = `<h1 style="font-size:15px;margin-top:18px">Submitted</h1>
+          <table class="kv"><tbody>${rows.map(([k,v]) =>
+            `<tr><th>${k}</th><td data-testid="row-${k}">${v || '—'}</td></tr>`).join('')}</tbody></table>`;
+      });
+    }
+  },
+
+  '/widgets': {
+    title: 'Widgets',
+    html: `
+      <header class="s-nav"><span class="s-logo">Acme</span>
+        <nav><a href="/elements">Elements</a><a href="/table">Table</a><a href="/login">Sign in</a></nav></header>
+      <main class="s-main wide stage-rel">
+
+        <div class="widget"><h2>Tabs</h2>
+          <div class="tabs" role="tablist">
+            <button role="tab" aria-selected="true" data-tab="details">Details</button>
+            <button role="tab" aria-selected="false" data-tab="shipping">Shipping</button>
+            <button role="tab" aria-selected="false" data-tab="payment">Payment</button>
+          </div>
+          <div class="panel" role="tabpanel" data-testid="panel-details">Order #4417, placed on 3 March.</div>
+          <div class="panel" role="tabpanel" data-testid="panel-shipping" hidden>Ships in 2 working days.</div>
+          <div class="panel" role="tabpanel" data-testid="panel-payment" hidden>Paid by card ending 4417.</div>
+        </div>
+
+        <div class="widget"><h2>Accordion</h2>
+          <button class="acc-head" aria-expanded="false" data-acc="shipping">Shipping address</button>
+          <div class="acc-body" data-testid="acc-shipping" hidden>14 Alder Road, Bristol</div>
+          <button class="acc-head" aria-expanded="false" data-acc="billing">Billing address</button>
+          <div class="acc-body" data-testid="acc-billing" hidden>Same as shipping address</div>
+        </div>
+
+        <div class="widget"><h2>Hover and click</h2>
+          <span class="tool"><button data-testid="tooltip-trigger">Copy link</button></span>
+          <button data-testid="modal-open" style="margin-left:8px">Delete account</button>
+          <button data-testid="save" class="ghost" style="margin-left:8px">Save changes</button>
+        </div>
+
+        <div class="widget"><h2>Dialogs</h2>
+          <button data-testid="alert-btn">Show alert</button>
+          <button data-testid="confirm-btn" style="margin-left:8px">Show confirm</button>
+          <button data-testid="prompt-btn" style="margin-left:8px">Show prompt</button>
+          <p class="stat" data-testid="dialog-result">No dialog yet</p>
+        </div>
+
+        <div class="widget"><h2>Waiting</h2>
+          <button data-testid="load-btn">Load data</button>
+          <button data-testid="arm" class="ghost" style="margin-left:8px">Enable in 1.5s</button>
+          <button data-testid="delayed-button" style="margin-left:8px" disabled>Now enabled</button>
+          <p class="stat" data-testid="load-slot">Nothing loaded</p>
+        </div>
+
+        <div class="widget"><h2>Drag and drop</h2>
+          <div class="drag">
+            <div class="box" draggable="true" data-testid="drag-source">Box A</div>
+            <div class="zone" data-testid="drop-zone">Drop it here</div>
+          </div>
+        </div>
+
+        <div class="widget"><h2>Frame</h2>
+          <div class="frame" data-frame="checkout">
+            <div class="frame-bar">demo.playground/embed/checkout</div>
+            <div class="frame-body">
+              <input id="coupon" placeholder="Coupon code">
+              <button id="apply" style="margin-top:10px">Apply</button>
+              <p class="stat" data-testid="coupon-status">No coupon applied</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="widget"><h2>Shadow DOM</h2>
+          <div id="shadow-host"></div>
+        </div>
+      </main>`,
+    init(root){
+      // tabs
+      root.querySelectorAll('[role=tab]').forEach(t => t.addEventListener('click', () => {
+        root.querySelectorAll('[role=tab]').forEach(x => x.setAttribute('aria-selected', String(x === t)));
+        root.querySelectorAll('[role=tabpanel]').forEach(p =>
+          p.hidden = p.dataset.testid !== 'panel-' + t.dataset.tab);
+      }));
+      // accordion
+      root.querySelectorAll('[data-acc]').forEach(b => b.addEventListener('click', () => {
+        const body = $(`[data-testid=acc-${b.dataset.acc}]`, root);
+        const open = body.hidden;
+        body.hidden = !open; b.setAttribute('aria-expanded', String(open));
+      }));
+      // tooltip
+      const tip = $('[data-testid=tooltip-trigger]', root), tool = tip.parentElement;
+      tip.addEventListener('mouseover', () => {
+        if (!tool.querySelector('.tip'))
+          tool.insertAdjacentHTML('beforeend', `<span class="tip" role="tooltip">Copied to clipboard</span>`);
+      });
+      tip.addEventListener('mouseout', () => { const t = tool.querySelector('.tip'); if (t) t.remove(); });
+      // modal
+      $('[data-testid=modal-open]', root).addEventListener('click', () => {
+        root.insertAdjacentHTML('beforeend', `
+          <div class="scrim" data-testid="scrim"><div class="modal" role="dialog" aria-label="Delete account">
+            <h2>Delete account</h2><p>This cannot be undone.</p>
+            <div class="btnrow"><button data-testid="modal-confirm">Delete</button>
+            <button class="ghost" data-testid="modal-cancel">Cancel</button></div>
+          </div></div>`);
+        root.querySelectorAll('[data-testid=modal-cancel],[data-testid=modal-confirm]').forEach(b =>
+          b.addEventListener('click', () => $('[data-testid=scrim]', root).remove()));
+      });
+      // toast
+      $('[data-testid=save]', root).addEventListener('click', () => {
+        if (root.querySelector('.toast')) return;
+        root.insertAdjacentHTML('beforeend', `<div class="toast" role="status">Changes saved</div>`);
+        setTimeout(() => { const t = root.querySelector('.toast'); if (t) t.remove(); }, 2500);
+      });
+      // dialogs
+      const dres = $('[data-testid=dialog-result]', root);
+      $('[data-testid=alert-btn]', root).addEventListener('click', () =>
+        hostDialog('alert', 'Your session is about to expire').then(() => dres.textContent = 'Alert acknowledged'));
+      $('[data-testid=confirm-btn]', root).addEventListener('click', () =>
+        hostDialog('confirm', 'Delete this item?').then(r => dres.textContent = r.accepted ? 'Confirmed' : 'Dismissed'));
+      $('[data-testid=prompt-btn]', root).addEventListener('click', () =>
+        hostDialog('prompt', 'What is your name?', '').then(r =>
+          dres.textContent = r.accepted ? `Hello, ${r.text}` : 'Dismissed'));
+      // waiting
+      const slot = $('[data-testid=load-slot]', root);
+      $('[data-testid=load-btn]', root).addEventListener('click', () => {
+        slot.innerHTML = `<span class="spin" data-testid="spinner"></span> Loading`;
+        setTimeout(() => slot.innerHTML = `<span data-testid="loaded">Data loaded</span>`, 1400);
+      });
+      $('[data-testid=arm]', root).addEventListener('click', () =>
+        setTimeout(() => $('[data-testid=delayed-button]', root).disabled = false, 1500));
+      // drag and drop
+      const zone = $('[data-testid=drop-zone]', root);
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault(); zone.classList.remove('over');
+        zone.textContent = 'Dropped: Box A';
+        const src = $('[data-testid=drag-source]', root); if (src) src.remove();
+      });
+      // frame
+      $('#apply', root).addEventListener('click', () => {
+        const c = $('#coupon', root).value.trim();
+        $('[data-testid=coupon-status]', root).textContent =
+          c ? `Coupon ${c} applied` : 'Enter a coupon code first';
+      });
+      // shadow DOM (a real open shadow root — locators pierce it)
+      const sr = $('#shadow-host', root).attachShadow({mode: 'open'});
+      sr.innerHTML = `
+        <style>
+          .c{border:1px solid #d7d3e8;border-radius:9px;padding:13px;font:14px system-ui}
+          button{background:#4b3fa8;color:#fff;border:0;padding:8px 14px;border-radius:8px;
+            font:inherit;font-size:13px;cursor:pointer}
+          p{margin:0 0 10px;color:#4a4766;font-size:13px}
+        </style>
+        <div class="c"><p data-testid="shadow-text">This lives inside a shadow root.</p>
+        <button data-testid="shadow-button">Click me</button>
+        <p style="margin:10px 0 0" data-testid="shadow-result">Not clicked</p></div>`;
+      sr.querySelector('[data-testid=shadow-button]').addEventListener('click', () =>
+        sr.querySelector('[data-testid=shadow-result]').textContent = 'Clicked inside the shadow root');
+    }
+  },
+
+  '/table': {
+    title: 'Team table',
+    html: `
+      <header class="s-nav"><span class="s-logo">Acme</span>
+        <nav><a href="/elements">Elements</a><a href="/widgets">Widgets</a><a href="/login">Sign in</a></nav></header>
+      <main class="s-main wide"><div class="s-card">
+        <h1>Team</h1>
+        <p class="s-sub">Sortable headers, a filter and five rows per page.</p>
+        <input type="search" id="filter" placeholder="Filter by name or role">
+        <table>
+          <thead><tr>
+            <th data-sort="name">Name</th><th data-sort="email">Email</th>
+            <th data-sort="role">Role</th><th data-sort="amount">Amount</th>
+            <th style="cursor:default">Actions</th>
+          </tr></thead>
+          <tbody data-testid="tbody"></tbody>
+        </table>
+        <div class="pager">
+          <button data-testid="prev">Previous</button>
+          <button data-testid="next">Next</button>
+          <span data-testid="row-count"></span>
+        </div>
+      </div></main>`,
+    init(root){
+      let data = [
+        ['Amara Osei','amara@acme.io','Engineer',4200], ['Bruno Sato','bruno@acme.io','Designer',3100],
+        ['Chen Wei','chen@acme.io','Engineer',5200],    ['Dara Khan','dara@acme.io','Manager',6100],
+        ['Elif Demir','elif@acme.io','Engineer',3900],  ['Farid Aziz','farid@acme.io','Support',2400],
+        ['Gia Rossi','gia@acme.io','Designer',3300],    ['Hugo Mendes','hugo@acme.io','Engineer',4800],
+        ['Ines Costa','ines@acme.io','Manager',5900],   ['Jonas Berg','jonas@acme.io','Support',2200],
+        ['Kira Volkov','kira@acme.io','Designer',3600], ['Liam Walsh','liam@acme.io','Engineer',4400]
+      ].map(([name,email,role,amount]) => ({name,email,role,amount}));
+      let sort = null, dir = 1, page = 1, q = '', PER = 5;
+      const tb = $('[data-testid=tbody]', root);
+
+      function view(){
+        let rows = data.filter(r =>
+          (r.name + ' ' + r.role).toLowerCase().includes(q.toLowerCase()));
+        if (sort) rows = [...rows].sort((a,b) =>
+          (a[sort] > b[sort] ? 1 : a[sort] < b[sort] ? -1 : 0) * dir);
+        return rows;
+      }
+      function render(){
+        const rows = view();
+        const pages = Math.max(1, Math.ceil(rows.length / PER));
+        page = Math.min(page, pages);
+        const slice = rows.slice((page-1)*PER, page*PER);
+        tb.innerHTML = slice.length ? slice.map(r => `
+          <tr data-testid="data-row">
+            <td>${r.name}</td><td>${r.email}</td><td>${r.role}</td>
+            <td>$${r.amount.toLocaleString('en-US')}</td>
+            <td><button data-name="${r.name}">Remove</button></td>
+          </tr>`).join('') : `<tr><td colspan="5" class="s-empty">No people match that filter</td></tr>`;
+        const from = rows.length ? (page-1)*PER + 1 : 0;
+        $('[data-testid=row-count]', root).textContent =
+          `Showing ${from}-${Math.min(page*PER, rows.length)} of ${rows.length}`;
+        $('[data-testid=prev]', root).disabled = page === 1;
+        $('[data-testid=next]', root).disabled = page === pages;
+        root.querySelectorAll('thead th').forEach(th =>
+          th.className = th.dataset.sort === sort ? (dir === 1 ? 'asc' : 'desc') : '');
+      }
+      root.querySelectorAll('thead th[data-sort]').forEach(th => th.addEventListener('click', () => {
+        if (sort === th.dataset.sort) dir = -dir; else { sort = th.dataset.sort; dir = 1; }
+        page = 1; render();
+      }));
+      $('#filter', root).addEventListener('input', e => { q = e.target.value; page = 1; render(); });
+      $('[data-testid=prev]', root).addEventListener('click', () => { page--; render(); });
+      $('[data-testid=next]', root).addEventListener('click', () => { page++; render(); });
+      tb.addEventListener('click', e => {
+        if (!e.target.dataset.name) return;
+        data = data.filter(r => r.name !== e.target.dataset.name); render();
+      });
+      render();
+    }
+  }
+
+};
+const ORIGIN = 'https://demo.playground';
+
+/* ---------------- page host ---------------- */
+const stage = $('#stage'), pageEl = $('#page'), ring = $('#ring'), cursor = $('#cursor');
+let currentPath = null, liveHTML = '', viewingSnapshot = false;
+
+function loadSite(path){
+  const site = SITES[path];
+  if (!site) throw new PWError(`page.goto: net::ERR_NAME_NOT_RESOLVED at ${ORIGIN}${path}\nKnown routes: ${Object.keys(SITES).join(', ')}`);
+  currentPath = path;
+  pageEl.innerHTML = site.html;
+  site.init(pageEl);
+  $('#url').textContent = ORIGIN + path;
+  const rt = document.getElementById('route'); if (rt) rt.value = path;
+  const mb = document.getElementById('matches'); if (mb) mb.innerHTML = '';
+  exitSnapshot();
+}
+function exitSnapshot(){ viewingSnapshot = false; $('#snapbar').classList.remove('on'); }
+
+/* ---------------- errors ---------------- */
+class PWError extends Error {}
+function timeoutError(call, target, log, ms){
+  return new PWError(`${call}: Timeout ${ms}ms exceeded.\nCall log:\n  - waiting for ${target}\n${log.map(l=>'  - '+l).join('\n')}`);
+}
+
+/* ---------------- locators ---------------- */
+/* Playwright pierces open shadow roots; plain querySelectorAll does not. */
+function qsa(root, sel){
+  let out;
+  try { out = [...root.querySelectorAll(sel)]; }
+  catch (e) { throw new PWError(`Invalid CSS selector: "${sel}"\n${e.message}`); }
+  const dive = n => {
+    if (!n.shadowRoot) return;
+    out.push(...n.shadowRoot.querySelectorAll(sel));
+    n.shadowRoot.querySelectorAll('*').forEach(dive);
+  };
+  root.querySelectorAll('*').forEach(dive);
+  return out;
+}
+const ROLES = {
+  button: 'button, input[type=button], input[type=submit], [role=button]',
+  link: 'a[href], [role=link]',
+  textbox: 'input:not([type]), input[type=text], input[type=password], input[type=email], input[type=search], textarea, [role=textbox]',
+  checkbox: 'input[type=checkbox], [role=checkbox]',
+  heading: 'h1,h2,h3,h4,h5,h6,[role=heading]',
+  listitem: 'li, [role=listitem]',
+  list: 'ul, ol, [role=list]',
+  combobox: 'select, [role=combobox]',
+  img: 'img, [role=img]',
+  article: 'article, [role=article]',
+  row: 'tr, [role=row]',
+  cell: 'td, [role=cell], [role=gridcell]',
+  columnheader: 'th, [role=columnheader]',
+  table: 'table, [role=table]',
+  tab: '[role=tab]',
+  tabpanel: '[role=tabpanel]',
+  tablist: '[role=tablist]',
+  dialog: '[role=dialog], dialog',
+  tooltip: '[role=tooltip]',
+  alert: '[role=alert]',
+  status: '[role=status], output',
+  radio: 'input[type=radio], [role=radio]',
+  switch: '[role=switch]',
+  option: 'option, [role=option]',
+  slider: 'input[type=range], [role=slider]',
+  spinbutton: 'input[type=number], [role=spinbutton]',
+  group: 'fieldset, [role=group]',
+  progressbar: 'progress, [role=progressbar]',
+  navigation: 'nav, [role=navigation]',
+  banner: 'header, [role=banner]',
+  main: 'main, [role=main]',
+  searchbox: 'input[type=search], [role=searchbox]',
+  paragraph: 'p'
+};
+function roleOf(el){
+  const explicit = el.getAttribute && el.getAttribute('role');
+  if (explicit) return explicit;
+  const t = el.tagName.toLowerCase();
+  if (t === 'input') return ({checkbox:'checkbox', radio:'radio', range:'slider', number:'spinbutton',
+    submit:'button', button:'button', search:'searchbox'}[el.type] || 'textbox');
+  return ({button:'button', textarea:'textbox', select:'combobox', li:'listitem', tr:'row',
+    td:'cell', th:'columnheader', table:'table', img:'img', ul:'list', ol:'list', nav:'navigation',
+    header:'banner', main:'main', p:'paragraph', article:'article', fieldset:'group',
+    option:'option', progress:'progressbar', output:'status',
+    h1:'heading', h2:'heading', h3:'heading', h4:'heading', h5:'heading', h6:'heading'}[t]
+    || (t === 'a' && el.hasAttribute('href') ? 'link' : null));
+}
+const norm = s => (s||'').replace(/\s+/g,' ').trim();
+function accName(el){
+  if (el.getAttribute('aria-label')) return norm(el.getAttribute('aria-label'));
+  if (el.tagName === 'FIELDSET') { const l = el.querySelector('legend'); return l ? norm(l.textContent) : ''; }
+  if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio')) {
+    const lab = (el.id && pageEl.querySelector(`label[for="${el.id}"]`)) || el.closest('label');
+    return lab ? norm(lab.textContent) : norm(el.value);
+  }
+  if (el.tagName === 'INPUT' && el.type !== 'submit') {
+    const lab = el.id && pageEl.querySelector(`label[for="${el.id}"]`);
+    if (lab) return norm(lab.textContent);
+    if (el.placeholder) return norm(el.placeholder);
+    return '';
+  }
+  if (el.tagName === 'INPUT') return norm(el.value);
+  return norm(el.textContent);
+}
+function matchText(actual, want, exact){
+  if (want instanceof RegExp) return want.test(actual);
+  return exact ? actual === norm(want) : actual.toLowerCase().includes(norm(want).toLowerCase());
+}
+function visible(el){
+  if (!el || el.hidden) return false;
+  const s = getComputedStyle(el);
+  if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return false;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0;
+}
+
+/* XPath. Scoped to the demo page:
+     //x  -> .//x   (search anywhere below the page root)
+     /x   -> ./x    (exact path from the page root)
+   XPath cannot cross a shadow boundary — same as real browsers. */
+function xpathAll(root, expr){
+  let e = expr.trim();
+  if (e.startsWith('//')) e = '.' + e;
+  else if (e.startsWith('/')) e = '.' + e;
+  const out = [];
+  let res;
+  try {
+    res = document.evaluate(e, root.nodeType === 1 ? root : pageEl, null,
+      XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+  } catch (err) {
+    throw new PWError(`Invalid XPath expression: ${expr}\n${err.message}`);
+  }
+  for (let i = 0; i < res.snapshotLength; i++) {
+    const n = res.snapshotItem(i);
+    if (n.nodeType === 1 && pageEl.contains(n)) out.push(n);
+  }
+  return out;
+}
+const isXPath = v => /^(xpath=|\/\/|\.\/|\/[a-zA-Z(])/.test(v.trim());
+
+function applyStep(ctx, step){
+  let out = [];
+  const push = els => els.forEach(e => { if (!out.includes(e)) out.push(e); });
+  for (const root of ctx) {
+    switch (step.k) {
+      case 'css': {
+        if (isXPath(step.v)) { push(xpathAll(root, step.v.replace(/^xpath=/, ''))); break; }
+        // support "sel:has-text('x')"
+        const m = step.v.match(/^(.*?):has-text\((['"`])(.*?)\2\)\s*$/);
+        if (m) {
+          const base = m[1].trim() || '*';
+          push(qsa(root, base).filter(e => matchText(norm(e.textContent), m[3], false)));
+        } else if (/^text=/.test(step.v)) {
+          const raw = step.v.slice(5).trim();
+          const ex = /^(['"]).*\1$/.test(raw);
+          const want = ex ? raw.slice(1,-1) : raw;
+          push(qsa(root, '*').filter(e =>
+            !e.children.length && matchText(norm(e.textContent), want, ex)));
+        } else push(qsa(root, step.v));
+        break;
+      }
+      case 'role': {
+        const sel = ROLES[step.v] || `[role=${step.v}]`;
+        let els = qsa(root, sel);
+        if (step.o && step.o.name != null) els = els.filter(e => matchText(accName(e), step.o.name, step.o.exact !== false));
+        if (step.o && step.o.checked != null) els = els.filter(e => !!e.checked === step.o.checked);
+        push(els); break;
+      }
+      case 'text':
+        push(qsa(root, '*').filter(e =>
+          !e.children.length && matchText(norm(e.textContent), step.v, step.o && step.o.exact)));
+        break;
+      case 'placeholder':
+        push(qsa(root, '[placeholder]').filter(e => matchText(e.placeholder, step.v, step.o && step.o.exact)));
+        break;
+      case 'testid':
+        push(qsa(root, '[data-testid]').filter(e => matchText(e.dataset.testid, step.v, true)));
+        break;
+      case 'label': {
+        const els = [];
+        qsa(root, 'label').forEach(l => {
+          if (!matchText(norm(l.textContent), step.v, step.o && step.o.exact)) return;
+          const t = l.htmlFor ? (l.getRootNode().querySelector('#' + CSS.escape(l.htmlFor)) || pageEl.querySelector('#' + CSS.escape(l.htmlFor))) : l.querySelector('input,select,textarea');
+          if (t) els.push(t);
+        });
+        push(els); break;
+      }
+      case 'frame': {
+        push(qsa(root, step.v).map(f => f.querySelector('.frame-body') || f));
+        break;
+      }
+      case 'title':
+        push(qsa(root, '[title]').filter(e => matchText(e.title, step.v, step.o && step.o.exact)));
+        break;
+    }
+  }
+  return out;
+}
+
+class Locator {
+  constructor(chain){ this.chain = chain; }
+  _add(step){ return new Locator([...this.chain, step]); }
+  _els(){
+    let ctx = [pageEl];
+    for (const step of this.chain) {
+      if (step.k === 'pick') {
+        const i = step.v < 0 ? ctx.length + step.v : step.v;
+        ctx = ctx[i] ? [ctx[i]] : [];
+      } else if (step.k === 'filterText') {
+        ctx = ctx.filter(e => matchText(norm(e.textContent), step.v, false));
+      } else ctx = applyStep(ctx, step);
+    }
+    return ctx;
+  }
+  locator(v){ return this._add({k:'css', v}); }
+  frameLocator(v){ return this._add({k:'frame', v}); }
+  getByRole(v,o){ return this._add({k:'role', v, o}); }
+  getByText(v,o){ return this._add({k:'text', v, o}); }
+  getByPlaceholder(v,o){ return this._add({k:'placeholder', v, o}); }
+  getByTestId(v){ return this._add({k:'testid', v}); }
+  getByLabel(v,o){ return this._add({k:'label', v, o}); }
+  getByTitle(v,o){ return this._add({k:'title', v, o}); }
+  filter(o){ return o && o.hasText != null ? this._add({k:'filterText', v:o.hasText}) : this; }
+  first(){ return this._add({k:'pick', v:0}); }
+  last(){ return this._add({k:'pick', v:-1}); }
+  nth(i){ return this._add({k:'pick', v:i}); }
+
+  async count(){ return this._els().length; }
+  async all(){ return this._els().map((_, i) => this.nth(i)); }
+  async allTextContents(){ return this._els().map(e => norm(e.textContent)); }
+  async allInnerTexts(){ return this._els().map(e => norm(e.textContent)); }
+  async isEnabled(){ const e = await this._resolve('locator.isEnabled'); return !e.disabled; }
+  async isDisabled(){ const e = await this._resolve('locator.isDisabled'); return !!e.disabled; }
+  async isEditable(){ const e = await this._resolve('locator.isEditable'); return !e.disabled && !e.readOnly; }
+  async boundingBox(){ const e = await this._resolve('locator.boundingBox'); const r = e.getBoundingClientRect();
+    return {x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height)}; }
+  async focus(){ await act('locator.focus', this, '', el => el.focus()); }
+  async blur(){ await act('locator.blur', this, '', el => el.blur()); }
+  async scrollIntoViewIfNeeded(){ await act('locator.scrollIntoViewIfNeeded', this, '',
+    el => el.scrollIntoView({block: 'center'})); }
+  async isVisible(){ const e = this._els()[0]; return !!e && visible(e); }
+  async textContent(){ const e = await this._resolve('locator.textContent'); return e.textContent; }
+  async innerText(){ const e = await this._resolve('locator.innerText'); return norm(e.textContent); }
+  async inputValue(){ const e = await this._resolve('locator.inputValue'); return e.value; }
+  async isChecked(){ const e = await this._resolve('locator.isChecked'); return !!e.checked; }
+  async getAttribute(n){ const e = await this._resolve('locator.getAttribute'); return e.getAttribute(n); }
+  async waitFor(o={}){ await this._resolve('locator.waitFor', o.timeout); return this; }
+
+  toString(){
+    return this.chain.map(s => ({
+      css:v=>`locator('${v}')`, role:v=>`getByRole('${v}'${s.o&&s.o.name?`, { name: '${s.o.name}' }`:''})`,
+      text:v=>`getByText('${v}')`, placeholder:v=>`getByPlaceholder('${v}')`,
+      testid:v=>`getByTestId('${v}')`, label:v=>`getByLabel('${v}')`, title:v=>`getByTitle('${v}')`,
+      filterText:v=>`filter({ hasText: '${v}' })`,
+      frame:v=>`frameLocator('${v}')`,
+      pick:v=>v===0?'first()':v===-1?'last()':`nth(${v})`
+    }[s.k] || (v=>String(v)))(s.v)).join('.');
+  }
+
+  /* auto-waiting: poll for an attached, visible, stable element */
+  async _resolve(call, timeout){
+    const ms = timeout ?? DEFAULT_TIMEOUT, t0 = performance.now(), log = [];
+    let last = '';
+    while (performance.now() - t0 < ms) {
+      checkAbort();
+      const els = this._els();
+      if (els.length > 1) {
+        throw new PWError(`${call}: strict mode violation — ${this} resolved to ${els.length} elements.\nUse .first(), .nth(i) or .filter() to narrow it down.`);
+      }
+      if (els.length === 1) {
+        const el = els[0];
+        if (visible(el)) return el;
+        last = 'element is not visible';
+      } else last = 'element is not attached to the DOM';
+      if (log[log.length-1] !== last) log.push(last);
+      await sleepRaw(40);
+    }
+    throw timeoutError(call, this.toString(), log, ms);
+  }
+}
+
+/* ---------------- dialogs ----------------
+   Real Playwright dismisses dialogs automatically unless a
+   'dialog' handler is registered. Same rule here. */
+let dialogHandler = null;
+function hostDialog(type, message, defaultValue = ''){
+  return new Promise(resolve => {
+    const banner = document.createElement('div');
+    banner.className = 'dialogbar';
+    banner.innerHTML = `<b>${type}</b><span></span>`;
+    banner.querySelector('span').textContent = message;
+    stage.appendChild(banner);
+    const rec = traceStart('dialog', `${type}: ${message}`);
+    const finish = (accepted, text) => {
+      banner.remove(); traceEnd(rec, true);
+      resolve({accepted, text: accepted ? (text ?? defaultValue) : null});
+    };
+    const dialog = {
+      type: () => type, message: () => message, defaultValue: () => defaultValue,
+      accept: async txt => { await sleep(Math.min(260, slowMo)); finish(true, txt); },
+      dismiss: async () => { await sleep(Math.min(260, slowMo)); finish(false); }
+    };
+    if (dialogHandler) { try { dialogHandler(dialog); } catch (e) { finish(false); } }
+    else setTimeout(() => finish(false), Math.min(300, slowMo || 60));   // auto-dismiss
+  });
+}
+
+/* ---------------- run state ---------------- */
+let DEFAULT_TIMEOUT = 5000;
+let running = false, aborted = false, slowMo = 350;
+function checkAbort(){ if (aborted) throw new PWError('Test run stopped.'); }
+async function sleep(ms){ const t0=performance.now(); while(performance.now()-t0<ms){ checkAbort(); await sleepRaw(Math.min(30, ms)); } }
+
+/* ---------------- visuals ---------------- */
+function boxOf(el){
+  const r = el.getBoundingClientRect(), s = stage.getBoundingClientRect();
+  return {top: r.top - s.top + stage.scrollTop, left: r.left - s.left + stage.scrollLeft,
+          width: r.width, height: r.height};
+}
+function placeRing(el, label){
+  const b = boxOf(el);
+  Object.assign(ring.style, {top: b.top-3+'px', left: b.left-3+'px',
+    width: b.width+6+'px', height: b.height+6+'px'});
+  const tag = ring.querySelector('b');
+  tag.textContent = label;
+  tag.style.top = (b.top - stage.scrollTop < 24) ? 'calc(100% + 4px)' : '-21px';
+  ring.classList.add('on');
+  return b;
+}
+async function focusOn(el, label){
+  if (slowMo === 0) return;
+  const {top, left, width, height} = placeRing(el, label);
+  const r = {width, height};
+  Object.assign(cursor.style, {top: top + r.height/2 + 'px', left: left + Math.min(r.width/2, 60) + 'px'});
+  cursor.classList.add('on');
+  await sleep(Math.max(120, slowMo * .6));
+  cursor.classList.add('tap');
+  await sleep(90);
+  cursor.classList.remove('tap');
+}
+function clearVisuals(){ ring.classList.remove('on'); cursor.classList.remove('on'); }
+
+/* ---------------- trace + console ---------------- */
+const traceBody = $('#traceBody'), consoleBody = $('#consoleBody');
+let steps = [], stepStart = 0;
+function traceStart(name, arg){
+  if (steps.length === 0) traceBody.innerHTML = '';
+  const el = document.createElement('div');
+  el.className = 'step run';
+  el.innerHTML = `<span class="ic">◌</span><span class="nm"></span><span class="ar"></span><span class="ms"></span>`;
+  el.querySelector('.nm').textContent = name;
+  el.querySelector('.ar').textContent = arg || '';
+  traceBody.appendChild(el); traceBody.scrollTop = traceBody.scrollHeight;
+  const rec = {el, t0: performance.now(), snap: null};
+  steps.push(rec);
+  el.addEventListener('click', () => showSnapshot(rec, name + ' ' + (arg||'')));
+  return rec;
+}
+function traceEnd(rec, ok){
+  rec.el.classList.remove('run');
+  rec.el.classList.add(ok ? 'pass' : 'fail');
+  rec.el.querySelector('.ic').textContent = ok ? '✓' : '✕';
+  rec.el.querySelector('.ms').textContent = Math.round(performance.now() - rec.t0) + 'ms';
+  rec.snap = pageEl.innerHTML;
+}
+function showSnapshot(rec, label){
+  if (!rec.snap) return;
+  if (!viewingSnapshot) liveHTML = pageEl.innerHTML;
+  viewingSnapshot = true;
+  clearVisuals();
+  pageEl.innerHTML = rec.snap;
+  $('#snaptext').textContent = 'Snapshot after: ' + label;
+  $('#snapbar').classList.add('on');
+  steps.forEach(s => s.el.classList.toggle('sel', s === rec));
+}
+$('#golive').addEventListener('click', () => {
+  pageEl.innerHTML = liveHTML;
+  steps.forEach(s => s.el.classList.remove('sel'));
+  exitSnapshot();
+});
+function out(msg, cls=''){
+  if (consoleBody.querySelector('.empty')) consoleBody.innerHTML = '';
+  const d = document.createElement('div');
+  d.className = 'log ' + cls; d.textContent = msg;
+  consoleBody.appendChild(d); consoleBody.scrollTop = consoleBody.scrollHeight;
+}
+
+/* ---------------- page object ---------------- */
+async function act(call, locator, label, fn){
+  const rec = traceStart(call, locator ? locator.toString() : label);
+  try {
+    if (locator) {
+      const el = await locator._resolve(call);
+      await focusOn(el, call);
+      fn(el);
+    } else await fn();
+    await sleep(slowMo * .35);
+    traceEnd(rec, true);
+    clearVisuals();
+  } catch (e) { traceEnd(rec, false); clearVisuals(); throw e; }
+}
+function fire(el, type, init={}){ el.dispatchEvent(new Event(type, {bubbles:true, ...init})); }
+
+const page = {
+  locator: v => new Locator([{k:'css', v}]),
+  getByRole: (v,o) => new Locator([{k:'role', v, o}]),
+  getByText: (v,o) => new Locator([{k:'text', v, o}]),
+  getByPlaceholder: (v,o) => new Locator([{k:'placeholder', v, o}]),
+  getByTestId: v => new Locator([{k:'testid', v}]),
+  getByLabel: (v,o) => new Locator([{k:'label', v, o}]),
+  getByTitle: (v,o) => new Locator([{k:'title', v, o}]),
+
+  frameLocator: v => new Locator([{k:'frame', v}]),
+  on(evt, fn){ if (evt === 'dialog') dialogHandler = fn; return page; },
+  off(evt){ if (evt === 'dialog') dialogHandler = null; return page; },
+  async evaluate(fn, arg){ return fn(arg); },
+  async goto(url){
+    const path = url.replace(ORIGIN, '').replace(/^https?:\/\/[^/]+/, '') || '/login';
+    await act('page.goto', null, url, async () => { loadSite(path); await sleep(Math.min(250, slowMo)); });
+    return null;
+  },
+  async reload(){ await act('page.reload', null, '', async () => loadSite(currentPath)); },
+  url: () => currentPath ? ORIGIN + currentPath : 'about:blank',
+  title: async () => currentPath ? SITES[currentPath].title : '',
+  async click(sel){ return page.locator(sel).click(); },
+  async fill(sel, v){ return page.locator(sel).fill(v); },
+  async waitForTimeout(ms){ await act('page.waitForTimeout', null, ms + 'ms', () => sleep(ms)); },
+  async screenshot(){ await act('page.screenshot', null, 'viewport', () => sleep(60)); return 'buffer<simulated>'; },
+  setDefaultTimeout(ms){ DEFAULT_TIMEOUT = ms; },
+  keyboard: {
+    async press(key){ await act('keyboard.press', null, key, () => {
+      const el = document.activeElement && pageEl.contains(document.activeElement) ? document.activeElement : pageEl;
+      el.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles:true}));
+      el.dispatchEvent(new KeyboardEvent('keyup', {key, bubbles:true}));
+    }); }
+  }
+};
+
+Object.assign(Locator.prototype, {
+  async click(){ await act('locator.click', this, '', el => el.click()); },
+  async dblclick(){ await act('locator.dblclick', this, '', el => { el.click(); el.click(); }); },
+  async hover(){ await act('locator.hover', this, '', el => {
+      el.dispatchEvent(new MouseEvent('mouseenter', {bubbles:false}));
+      el.dispatchEvent(new MouseEvent('mouseover', {bubbles:true}));
+      el.dispatchEvent(new MouseEvent('mousemove', {bubbles:true}));
+    }); },
+  async fill(v){ await act('locator.fill', this, '', el => { el.focus(); el.value = v; fire(el,'input'); fire(el,'change'); }); },
+  async type(v){ await act('locator.type', this, '', el => { el.focus(); el.value = ''; for (const c of v) { el.value += c; fire(el,'input'); } }); },
+  async press(key){ await act('locator.press', this, '', el => {
+      el.focus();
+      el.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles:true}));
+      if (key.length === 1) { el.value = (el.value||'') + key; fire(el,'input'); }
+      el.dispatchEvent(new KeyboardEvent('keyup', {key, bubbles:true}));
+    }); },
+  async check(){ await act('locator.check', this, '', el => { if (!el.checked) el.click(); }); },
+  async uncheck(){ await act('locator.uncheck', this, '', el => { if (el.checked) el.click(); }); },
+  async selectOption(v){ await act('locator.selectOption', this, '', el => {
+      const want = (Array.isArray(v) ? v : [v]).map(x =>
+        x && typeof x === 'object' ? (x.label ?? x.value ?? x.index) : x);
+      [...el.options].forEach((o, i) => {
+        o.selected = want.some(w => typeof w === 'number'
+          ? w === i : (o.value === String(w) || norm(o.textContent) === String(w)));
+      });
+      fire(el,'input'); fire(el,'change');
+    }); },
+  async setInputFiles(files){ await act('locator.setInputFiles', this, '', el => {
+      const names = (Array.isArray(files) ? files : [files]).map(f =>
+        typeof f === 'string' ? f.split('/').pop() : f.name);
+      try {
+        const dt = new DataTransfer();
+        names.forEach(n => dt.items.add(new File(['simulated contents'], n, {type: 'application/octet-stream'})));
+        el.files = dt.files;
+      } catch (e) { el.dataset.files = names.join(', '); }
+      fire(el,'input'); fire(el,'change');
+    }); },
+  async dragTo(target){
+    const src = await this._resolve('locator.dragTo');
+    const dst = await target._resolve('locator.dragTo');
+    await act('locator.dragTo', null, `${this} → ${target}`, async () => {
+      await focusOn(src, 'drag'); 
+      let dt; try { dt = new DataTransfer(); } catch (e) { dt = null; }
+      const ev = t => { try { return new DragEvent(t, {bubbles:true, cancelable:true, dataTransfer:dt}); }
+                        catch (e) { return new Event(t, {bubbles:true, cancelable:true}); } };
+      src.dispatchEvent(ev('dragstart'));
+      await focusOn(dst, 'drop');
+      dst.dispatchEvent(ev('dragover'));
+      dst.dispatchEvent(ev('drop'));
+      src.dispatchEvent(ev('dragend'));
+    });
+  },
+  async clear(){ await act('locator.clear', this, '', el => { el.value=''; fire(el,'input'); }); }
+});
+
+/* ---------------- expect ---------------- */
+function expect(subject){
+  const build = (neg) => {
+    const check = async (name, detail, test) => {
+      const label = subject instanceof Locator ? subject.toString()
+        : subject === page ? 'page' : JSON.stringify(subject);
+      const rec = traceStart(`expect${neg?'.not':''}.${name}`, label + (detail!=null?` → ${JSON.stringify(detail)}`:''));
+      const ms = DEFAULT_TIMEOUT, t0 = performance.now();
+      let got;
+      if (!(subject instanceof Locator)) {                    // plain value: no retry
+        const r = test();
+        got = r.actual;
+        if (r.pass !== !neg) { traceEnd(rec, false);
+          throw new PWError(`expect(received)${neg?'.not':''}.${name}(expected)\nExpected: ${JSON.stringify(detail)}\nReceived: ${JSON.stringify(got)}`); }
+        traceEnd(rec, true); return;
+      }
+      while (performance.now() - t0 < ms) {                   // locator: retry until it settles
+        checkAbort();
+        const r = test();
+        got = r.actual;
+        if (r.pass === !neg) {
+          const el = subject._els()[0];
+          if (el && slowMo) { await focusOn(el, 'expect'); clearVisuals(); }
+          traceEnd(rec, true); return;
+        }
+        await sleepRaw(40);
+      }
+      traceEnd(rec, false); clearVisuals();
+      throw new PWError(
+        `expect(locator)${neg?'.not':''}.${name}(expected) failed.\n` +
+        `Locator: ${subject}\nExpected: ${detail===undefined?(neg?'not ':'')+name:JSON.stringify(detail)}\n` +
+        `Received: ${JSON.stringify(got)}\nTimeout ${ms}ms exceeded.`);
+    };
+    const first = () => subject instanceof Locator ? subject._els()[0] : null;
+    if (subject === page) return {
+      toHaveTitle: v => check('toHaveTitle', v, () => {
+        const a = currentPath ? SITES[currentPath].title : '';
+        return {pass: matchText(a, v, !(v instanceof RegExp)), actual: a}; }),
+      toHaveURL: v => check('toHaveURL', v, () => {
+        const a = page.url(); return {pass: matchText(a, v, !(v instanceof RegExp)), actual: a}; })
+    };
+    return {
+      toBeVisible: () => check('toBeVisible', undefined, () => ({pass: visible(first()), actual: first()? 'hidden':'not found'})),
+      toBeHidden: () => check('toBeHidden', undefined, () => ({pass: !visible(first()), actual: 'visible'})),
+      toBeChecked: () => check('toBeChecked', undefined, () => ({pass: !!(first()&&first().checked), actual: 'unchecked'})),
+      toBeEnabled: () => check('toBeEnabled', undefined, () => ({pass: !!(first()&&!first().disabled), actual: 'disabled'})),
+      toBeDisabled: () => check('toBeDisabled', undefined, () => ({pass: !!(first()&&first().disabled), actual: 'enabled'})),
+      toHaveText: v => check('toHaveText', v, () => { const e = first(); const a = e?norm(e.textContent):null;
+        return {pass: a!=null && matchText(a, v, !(v instanceof RegExp)), actual: a}; }),
+      toContainText: v => check('toContainText', v, () => { const e = first(); const a = e?norm(e.textContent):null;
+        return {pass: a!=null && matchText(a, v, false), actual: a}; }),
+      toHaveValue: v => check('toHaveValue', v, () => { const e = first(); const a = e?e.value:null;
+        return {pass: a!=null && matchText(a, v, true), actual: a}; }),
+      toHaveCount: n => check('toHaveCount', n, () => { const a = subject._els().length; return {pass: a===n, actual: a}; }),
+      toHaveAttribute: (k,v) => check('toHaveAttribute', v, () => { const e=first(); const a=e?e.getAttribute(k):null;
+        return {pass: a!=null && (v===undefined||matchText(a,v,true)), actual:a}; }),
+      toBe: v => check('toBe', v, () => ({pass: subject === v, actual: subject})),
+      toEqual: v => check('toEqual', v, () => ({pass: JSON.stringify(subject) === JSON.stringify(v), actual: subject})),
+      toContain: v => check('toContain', v, () => ({pass: String(subject).includes(v), actual: subject})),
+      toBeTruthy: () => check('toBeTruthy', undefined, () => ({pass: !!subject, actual: subject})),
+      toBeGreaterThan: v => check('toBeGreaterThan', v, () => ({pass: subject > v, actual: subject}))
+    };
+  };
+  const api = build(false);
+  api.not = build(true);
+  return api;
+}
+
+/* ---------------- the runner ---------------- */
+const runBtn = $('#run'), summary = $('#summary'), pagedot = $('#pagedot');
+async function run(){
+  if (running) { aborted = true; return; }
+  running = true; aborted = false; steps = [];
+  runBtn.textContent = 'Stop'; runBtn.classList.replace('run','stop');
+  pagedot.className = 'dot busy';
+  traceBody.innerHTML = ''; consoleBody.innerHTML = '';
+  summary.textContent = 'Running…'; summary.style.color = 'var(--amber)';
+  if (isNarrow()) panel('page');
+  if (picking) setPicking(false);
+  DEFAULT_TIMEOUT = 5000; dialogHandler = null;
+  const t0 = performance.now();
+
+  let src = $('#code').value
+    .replace(/^\s*(import[^\n]*|const\s*\{[^}]*\}\s*=\s*require\([^)]*\);?)\s*$/gm, '');
+
+  const tests = [];
+  const test = (name, fn) => tests.push({name, fn});
+  test.describe = (name, fn) => fn();
+  test.beforeEach = fn => tests.unshift({name: 'beforeEach', fn, hook: true});
+  const fakeConsole = {
+    log: (...a) => out(a.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' ')),
+    error: (...a) => out(a.join(' '), 'err'),
+    warn: (...a) => out(a.join(' '), 'info')
+  };
+
+  let failed = 0, ran = 0;
+  try {
+    const body = new Function('page','expect','test','console',
+      `return (async () => {\n${src}\n})();`);
+    await body(page, expect, test, fakeConsole);
+
+    for (const t of tests) {
+      checkAbort();
+      if (!t.hook) { ran++; out(`▸ ${t.name}`, 'info'); }
+      try { await t.fn({page, expect}); }
+      catch (e) {
+        failed++;
+        out((t.hook ? 'beforeEach: ' : '') + e.message, 'err');
+        if (!(e instanceof PWError)) out(e.stack ? e.stack.split('\n')[0] : '', 'err');
+        break;
+      }
+    }
+    if (tests.length && !failed) out(`${ran} passed`, 'ok');
+  } catch (e) {
+    failed++;
+    out(e.message, 'err');
+  }
+
+  const dur = ((performance.now() - t0)/1000).toFixed(2);
+  if (aborted) { summary.textContent = `Stopped after ${dur}s`; summary.style.color = 'var(--muted)'; }
+  else if (failed) { summary.textContent = `✕ failed  ·  ${steps.length} steps  ·  ${dur}s`; summary.style.color = 'var(--rose)'; }
+  else { summary.textContent = `✓ passed  ·  ${steps.length} steps  ·  ${dur}s`; summary.style.color = 'var(--mint)'; }
+  if (failed && !aborted) { switchTab('console'); if (isNarrow()) panel('out'); }
+  else if (isNarrow()) setTimeout(() => panel('out'), 600);
+
+  running = false; aborted = false; clearVisuals();
+  runBtn.textContent = 'Run test'; runBtn.classList.replace('stop','run');
+  pagedot.className = 'dot live';
+}
+
+/* ---------------- examples ---------------- */
+const EXAMPLES = {
+login: `const { test, expect } = require('@playwright/test');
+
+test('signs in with valid credentials', async ({ page }) => {
+  await page.goto('https://demo.playground/login');
+
+  await page.getByLabel('Username').fill('admin');
+  await page.getByLabel('Password').fill('secret123');
+  await page.getByRole('button', { name: 'Log in' }).click();
+
+  // The site takes ~700ms to respond. No sleep needed —
+  // the assertion retries until it passes or times out.
+  await expect(page.getByTestId('welcome')).toHaveText('Welcome back, admin');
+  await expect(page.getByTestId('flash')).toContainText('Signed in');
+
+  console.log('title:', await page.title());
+});`,
+
+todo: `const { test, expect } = require('@playwright/test');
+
+test('adds and completes tasks', async ({ page }) => {
+  await page.goto('https://demo.playground/todo');
+
+  const input = page.getByPlaceholder('What needs doing?');
+  for (const task of ['Write a test', 'Read the trace', 'Ship it']) {
+    await input.fill(task);
+    await input.press('Enter');
+  }
+
+  const items = page.getByTestId('todo-item');
+  await expect(items).toHaveCount(3);
+  await expect(page.getByTestId('todo-count')).toHaveText('3 tasks left');
+
+  // Complete the first one, then filter down to what's left.
+  await items.first().locator('input[type=checkbox]').check();
+  await expect(page.getByTestId('todo-count')).toHaveText('2 tasks left');
+
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expect(page.getByTestId('todo-item')).toHaveCount(1);
+});`,
+
+shop: `const { test, expect } = require('@playwright/test');
+
+test('search filters products and cart updates', async ({ page }) => {
+  await page.goto('https://demo.playground/shop');
+
+  await expect(page.getByTestId('product')).toHaveCount(4);
+
+  await page.locator('#search').fill('nomad');
+  await expect(page.getByTestId('product')).toHaveCount(2);
+
+  const nomad87 = page.getByTestId('product').filter({ hasText: 'Nomad 87' });
+  await expect(nomad87.locator('.pr')).toHaveText('$159');
+
+  await nomad87.getByRole('button').click();
+  await expect(page.getByTestId('cart-count')).toHaveText('Cart: 1');
+
+  await page.locator('#search').fill('zzz');
+  await expect(page.getByText('No products match that search')).toBeVisible();
+});`,
+
+elements: `const { test, expect } = require('@playwright/test');
+
+test('fills one of every form control', async ({ page }) => {
+  await page.goto('https://demo.playground/elements');
+  await expect(page).toHaveTitle('Form elements');
+
+  await page.getByLabel('First name').fill('Ada');
+  await page.getByLabel('Email').fill('ada@example.com');
+  await page.getByLabel('Quantity').fill('3');
+  await page.getByLabel('About you').fill('I automate things.');
+
+  // Read-only and disabled inputs
+  await expect(page.getByLabel('Account ID')).toHaveValue('ACC-4417');
+  await expect(page.getByLabel('Legacy code')).toBeDisabled();
+
+  // Radios, checkboxes and a switch
+  await page.getByRole('radio', { name: 'Pro' }).check();
+  await page.getByLabel('Subscribe to the newsletter').check();
+  await page.getByRole('switch').check();
+
+  // Single and multi select
+  await page.getByLabel('Country').selectOption('Japan');
+  await page.getByLabel('Skills').selectOption(['Playwright', 'Selenium']);
+
+  // Range, date and file upload
+  await page.getByLabel('Volume').fill('70');
+  await expect(page.getByTestId('volume-value')).toHaveText('70');
+  await page.getByLabel('Start date').fill('2026-03-14');
+  await page.getByLabel('Resume').setInputFiles('report.pdf');
+  await expect(page.getByTestId('file-name')).toHaveText('report.pdf');
+
+  await page.getByRole('button', { name: 'Submit' }).click();
+
+  const result = page.getByTestId('result');
+  await expect(result).toBeVisible();
+  await expect(result.getByTestId('row-plan')).toHaveText('Pro');
+  await expect(result.getByTestId('row-skills')).toHaveText('Playwright, Selenium');
+  await expect(result.getByTestId('row-country')).toHaveText('Japan');
+  await expect(result.getByTestId('row-dark-mode')).toHaveText('on');
+});`,
+
+widgets: `const { test, expect } = require('@playwright/test');
+
+test('drives the interactive widgets', async ({ page }) => {
+  await page.goto('https://demo.playground/widgets');
+
+  // Tabs
+  await page.getByRole('tab', { name: 'Shipping' }).click();
+  await expect(page.getByTestId('panel-shipping')).toBeVisible();
+  await expect(page.getByTestId('panel-details')).toBeHidden();
+
+  // Accordion
+  await page.getByRole('button', { name: 'Billing address' }).click();
+  await expect(page.getByTestId('acc-billing')).toHaveText('Same as shipping address');
+
+  // Tooltip appears on hover only
+  await page.getByTestId('tooltip-trigger').hover();
+  await expect(page.getByRole('tooltip')).toHaveText('Copied to clipboard');
+
+  // Modal
+  await page.getByRole('button', { name: 'Delete account' }).click();
+  const modal = page.getByRole('dialog');
+  await expect(modal).toBeVisible();
+  await modal.getByRole('button', { name: 'Cancel' }).click();
+  await expect(modal).toBeHidden();
+
+  // Spinner is replaced by content — no sleep, just an assertion
+  await page.getByRole('button', { name: 'Load data' }).click();
+  await expect(page.getByTestId('loaded')).toHaveText('Data loaded');
+
+  // A button that only becomes enabled later
+  await page.getByRole('button', { name: 'Enable in 1.5s' }).click();
+  await expect(page.getByTestId('delayed-button')).toBeEnabled();
+
+  // Drag and drop
+  await page.getByTestId('drag-source').dragTo(page.getByTestId('drop-zone'));
+  await expect(page.getByTestId('drop-zone')).toHaveText('Dropped: Box A');
+
+  // A toast that shows up and then leaves on its own
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  const toast = page.getByRole('status');
+  await expect(toast).toBeVisible();
+  await expect(toast).toBeHidden();
+});`,
+
+advanced: `const { test, expect } = require('@playwright/test');
+
+test('dialogs, frames and shadow DOM', async ({ page }) => {
+  await page.goto('https://demo.playground/widgets');
+
+  // Without a handler, Playwright dismisses every dialog.
+  page.on('dialog', async dialog => {
+    console.log(dialog.type(), '->', dialog.message());
+    if (dialog.type() === 'prompt') await dialog.accept('Ada');
+    else await dialog.accept();
+  });
+
+  await page.getByRole('button', { name: 'Show confirm' }).click();
+  await expect(page.getByTestId('dialog-result')).toHaveText('Confirmed');
+
+  await page.getByRole('button', { name: 'Show prompt' }).click();
+  await expect(page.getByTestId('dialog-result')).toHaveText('Hello, Ada');
+
+  // A frame is a separate document, so scope into it first
+  const frame = page.frameLocator('[data-frame="checkout"]');
+  await frame.getByPlaceholder('Coupon code').fill('PLAYWRIGHT20');
+  await frame.getByRole('button', { name: 'Apply' }).click();
+  await expect(frame.getByTestId('coupon-status')).toHaveText('Coupon PLAYWRIGHT20 applied');
+
+  // Locators pierce open shadow roots with no extra ceremony
+  await expect(page.getByTestId('shadow-text')).toContainText('shadow root');
+  await page.getByTestId('shadow-button').click();
+  await expect(page.getByTestId('shadow-result')).toHaveText('Clicked inside the shadow root');
+});`,
+
+table: `const { test, expect } = require('@playwright/test');
+
+test('sorts, pages and filters a table', async ({ page }) => {
+  await page.goto('https://demo.playground/table');
+
+  const rows = page.getByTestId('data-row');
+  await expect(rows).toHaveCount(5);
+  await expect(page.getByTestId('row-count')).toHaveText('Showing 1-5 of 12');
+
+  // Paging
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(rows).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled();
+
+  // Sorting by a column header, ascending then descending
+  await page.getByRole('columnheader', { name: 'Amount' }).click();
+  await expect(rows.first()).toContainText('Jonas Berg');
+  await page.getByRole('columnheader', { name: 'Amount' }).click();
+  await expect(rows.first()).toContainText('Dara Khan');
+
+  // Filtering
+  await page.getByPlaceholder('Filter by name or role').fill('engineer');
+  await expect(rows).toHaveCount(5);
+  await expect(page.getByTestId('row-count')).toHaveText('Showing 1-5 of 5');
+
+  // Reach into one row, then act on it
+  const chen = rows.filter({ hasText: 'Chen Wei' });
+  await expect(chen.getByRole('cell').nth(3)).toHaveText('$5,200');
+  const names = [];
+  for (const row of await rows.all()) {
+    names.push(await row.getByRole('cell').first().textContent());
+  }
+  console.log('on screen:', names.join(', '));
+
+  await chen.getByRole('button', { name: 'Remove' }).click();
+  await expect(rows).toHaveCount(4);
+});`,
+
+wait: `const { test, expect } = require('@playwright/test');
+
+// Auto-waiting: every action polls until the element is
+// attached, visible and actionable — or the timeout hits.
+test('waits for a slow response without any sleeps', async ({ page }) => {
+  await page.goto('https://demo.playground/login');
+
+  await page.getByPlaceholder('Enter username').fill('admin');
+  await page.getByPlaceholder('Enter password').fill('secret123');
+  await page.getByTestId('login-button').click();
+
+  const welcome = page.getByTestId('welcome');   // does not exist yet
+  await expect(welcome).toBeVisible();           // ...retries until it does
+  console.log('resolved to:', await welcome.textContent());
+
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+});`,
+
+fail: `const { test, expect } = require('@playwright/test');
+
+// Two ways a run goes red. Comment one out to see the other.
+test('shows what a failure looks like', async ({ page }) => {
+  await page.goto('https://demo.playground/login');
+
+  await page.getByLabel('Username').fill('admin');
+  await page.getByLabel('Password').fill('wrong-password');
+  await page.getByTestId('login-button').click();
+
+  // Fails after retrying for 5s: the welcome heading never appears.
+  await expect(page.getByTestId('welcome')).toBeVisible();
+
+  // Strict mode: this locator matches three links at once.
+  await page.locator('nav a').click();
+});`
+};
+
+/* ---------------- editor ---------------- */
+const ta = $('#code'), hl = $('#hl');
+const TOKEN = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|(`(?:\\.|[^`\\])*`|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")|\b(const|let|var|async|await|function|return|if|else|for|of|in|while|new|try|catch|throw|require|true|false|null|undefined)\b|\b(\d+(?:\.\d+)?)\b|\b(page|expect|test|console)\b|([A-Za-z_$][\w$]*)(?=\s*\()/g;
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function paint(){
+  const v = ta.value;
+  hl.innerHTML = esc(v).replace(TOKEN, (m,c,s,k,n,g,f) =>
+    c ? `<span class="t-com">${m}</span>` : s ? `<span class="t-str">${m}</span>` :
+    k ? `<span class="t-key">${m}</span>` : n ? `<span class="t-num">${m}</span>` :
+    g ? `<span class="t-glob">${m}</span>` : `<span class="t-fn">${m}</span>`) + '\n';
+  ta.style.height = Math.max(hl.parentElement.offsetHeight, 220) + 'px';
+}
+ta.addEventListener('input', paint);
+window.addEventListener('resize', paint);
+ta.addEventListener('keydown', e => {
+  if (e.key === 'Tab') { e.preventDefault();
+    const s = ta.selectionStart; ta.value = ta.value.slice(0,s) + '  ' + ta.value.slice(ta.selectionEnd);
+    ta.selectionStart = ta.selectionEnd = s + 2; paint();
+  }
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run(); }
+});
+
+/* ---------------- wiring ---------------- */
+function switchTab(name){
+  document.querySelectorAll('.hdr .tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
+  traceBody.style.display = name === 'trace' ? '' : 'none';
+  consoleBody.style.display = name === 'console' ? '' : 'none';
+  inspectBody.style.display = name === 'inspect' ? '' : 'none';
+}
+document.querySelectorAll('.hdr .tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+function panel(name){
+  document.body.dataset.panel = name;
+  document.querySelectorAll('#mobtabs button').forEach(b => b.classList.toggle('on', b.dataset.panel === name));
+  if (name === 'code') paint();
+}
+document.querySelectorAll('#mobtabs button').forEach(b =>
+  b.addEventListener('click', () => panel(b.dataset.panel)));
+const isNarrow = () => window.matchMedia('(max-width:860px)').matches;
+
+$('#run').addEventListener('click', run);
+$('#reset').addEventListener('click', () => { loadSite(currentPath || '/login'); });
+$('#clear').addEventListener('click', () => {
+  traceBody.innerHTML = '<div class="empty">Trace cleared.</div>';
+  consoleBody.innerHTML = '<div class="empty">Console cleared.</div>';
+  summary.textContent = 'Ready.'; summary.style.color = 'var(--dim)'; steps = [];
+});
+$('#speed').addEventListener('input', e => {
+  slowMo = +e.target.value;
+  $('#speedv').textContent = slowMo ? slowMo + 'ms' : 'instant';
+});
+$('#examples').addEventListener('change', e => {
+  ta.value = EXAMPLES[e.target.value]; paint();
+  $('#fname').textContent = e.target.value + '.spec.js';
+});
+
+
+/* ============================================================
+   Inspector: pick an element, get ranked locators, test any
+   locator you type. Wrong locators raise the same errors the
+   runner would: 0 matches, strict-mode violation, or a syntax
+   error from the CSS/XPath engine.
+   ============================================================ */
+const inspectBody = $('#inspectBody'), inspectOut = $('#inspectOut'),
+      matches = $('#matches'), testerInput = $('#testerInput'), testerOut = $('#testerOut');
+let picking = false, picked = null;
+
+const q = v => `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+
+function labelTextFor(el){
+  const root = el.getRootNode();
+  if (el.id) {
+    const l = (root.querySelector && root.querySelector(`label[for="${CSS.escape(el.id)}"]`))
+      || pageEl.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+    if (l) return norm(l.textContent);
+  }
+  const wrap = el.closest && el.closest('label');
+  return wrap ? norm(wrap.textContent) : null;
+}
+function cssPathOf(el){
+  const parts = [];
+  let n = el;
+  while (n && n.nodeType === 1 && n !== pageEl) {
+    if (n.dataset && n.dataset.testid) { parts.unshift(`[data-testid="${n.dataset.testid}"]`); break; }
+    if (n.id) { parts.unshift('#' + n.id); break; }
+    let sel = n.tagName.toLowerCase();
+    const cls = [...n.classList].filter(c => !/^(over|active|asc|desc|on|sel|run|pass|fail|done)$/.test(c));
+    if (cls.length) sel += '.' + cls.slice(0, 2).join('.');
+    const sibs = n.parentElement ? [...n.parentElement.children].filter(c => c.tagName === n.tagName) : [];
+    if (sibs.length > 1) sel += `:nth-of-type(${sibs.indexOf(n) + 1})`;
+    parts.unshift(sel);
+    n = n.parentElement;          // CSS pierces shadow roots, so don't cross the host
+  }
+  return parts.join(' > ');
+}
+function xpathOf(el){
+  if (el.getRootNode() !== document) return null;           // inside a shadow root
+  const parts = [];
+  let n = el;
+  while (n && n !== pageEl && n.parentElement) {
+    const tag = n.tagName.toLowerCase();
+    const sibs = [...n.parentElement.children].filter(c => c.tagName === n.tagName);
+    parts.unshift(sibs.length > 1 ? `${tag}[${sibs.indexOf(n) + 1}]` : tag);
+    n = n.parentElement;
+  }
+  return '/' + parts.join('/');
+}
+
+/* Build a Locator from whatever the user typed. */
+function buildLocator(input){
+  const t = input.trim().replace(/;+$/, '');
+  if (!t) return null;
+  if (/^(await\s+)?(page\.)?(locator|getBy|frameLocator)/.test(t)) {
+    const expr = t.replace(/^await\s+/, '').replace(/^page\./, '');
+    let fn;
+    try { fn = new Function('page', `return page.${expr};`); }
+    catch (e) { throw new PWError(`SyntaxError: could not parse\n  page.${expr}\n${e.message}`); }
+    const loc = fn(page);
+    if (!(loc instanceof Locator)) throw new PWError('That expression did not return a locator.');
+    return loc;
+  }
+  return page.locator(t);
+}
+
+function drawMatches(els){
+  matches.innerHTML = '';
+  els.slice(0, 40).forEach((el, i) => {
+    const b = boxOf(el), d = document.createElement('i');
+    Object.assign(d.style, {top: b.top + 'px', left: b.left + 'px',
+      width: b.width + 'px', height: b.height + 'px'});
+    if (els.length > 1) d.innerHTML = `<b>${i + 1}</b>`;
+    matches.appendChild(d);
+  });
+}
+function clearMatches(){ matches.innerHTML = ''; }
+
+function countOf(code){
+  try { const l = buildLocator(code); return l ? l._els().length : 0; }
+  catch (e) { return -1; }
+}
+
+function runTester(){
+  const raw = testerInput.value;
+  if (!raw.trim()) {
+    clearMatches();
+    testerOut.className = 'tres';
+    testerOut.textContent = 'Matches are outlined in the page as you type.';
+    return;
+  }
+  let loc, els;
+  try { loc = buildLocator(raw); els = loc._els(); }
+  catch (e) {
+    clearMatches();
+    testerOut.className = 'tres bad';
+    testerOut.textContent = e.message;
+    return;
+  }
+  drawMatches(els);
+  const desc = loc.toString();
+  if (els.length === 0) {
+    testerOut.className = 'tres bad';
+    testerOut.textContent =
+      `Error: ${desc} resolved to 0 elements.\nAny action on it would fail with "Timeout ${DEFAULT_TIMEOUT}ms exceeded".`;
+  } else if (els.length === 1) {
+    const el = els[0];
+    testerOut.className = 'tres ok';
+    testerOut.textContent = `1 match — <${el.tagName.toLowerCase()}>${visible(el) ? '' : '  (not visible, so actions would time out)'}`;
+  } else {
+    testerOut.className = 'tres warn';
+    testerOut.textContent =
+      `strict mode violation: ${desc} resolved to ${els.length} elements.\nNarrow it with .first(), .nth(i) or .filter({ hasText: '…' }).`;
+  }
+}
+let testerTimer;
+testerInput.addEventListener('input', () => {
+  clearTimeout(testerTimer); testerTimer = setTimeout(runTester, 180);
+});
+
+/* ---- candidate locators for a picked element ---- */
+function candidatesFor(el){
+  const out = [], add = (group, code) => out.push({group, code});
+  const tag = el.tagName.toLowerCase();
+  const testid = el.dataset && el.dataset.testid;
+  const role = roleOf(el), name = accName(el), lab = labelTextFor(el);
+  const text = !el.children.length ? norm(el.textContent) : '';
+
+  if (testid) add('Recommended', `getByTestId(${q(testid)})`);
+  if (role && name) add('Recommended', `getByRole(${q(role)}, { name: ${q(name)} })`);
+  else if (role) add('Recommended', `getByRole(${q(role)})`);
+  if (lab && /^(input|select|textarea)$/.test(tag)) add('Recommended', `getByLabel(${q(lab)})`);
+  if (el.placeholder) add('Recommended', `getByPlaceholder(${q(el.placeholder)})`);
+  if (text && text.length < 50) add('Recommended', `getByText(${q(text)})`);
+  if (el.title) add('Recommended', `getByTitle(${q(el.title)})`);
+
+  if (el.id) add('CSS', `locator(${q('#' + el.id)})`);
+  if (testid) add('CSS', `locator(${q(`[data-testid="${testid}"]`)})`);
+  if (el.name) add('CSS', `locator(${q(`${tag}[name="${el.name}"]`)})`);
+  const path = cssPathOf(el);
+  if (path) add('CSS', `locator(${q(path)})`);
+  if (text && text.length < 40) add('CSS', `locator(${q(`${tag}:has-text("${text}")`)})`);
+
+  if (el.getRootNode() === document) {
+    if (testid) add('XPath', `locator(${q(`//${tag}[@data-testid='${testid}']`)})`);
+    if (el.id) add('XPath', `locator(${q(`//${tag}[@id='${el.id}']`)})`);
+    if (el.name) add('XPath', `locator(${q(`//${tag}[@name='${el.name}']`)})`);
+    if (el.placeholder) add('XPath', `locator(${q(`//${tag}[@placeholder='${el.placeholder}']`)})`);
+    if (text && text.length < 40) {
+      add('XPath', `locator(${q(`//${tag}[text()='${text}']`)})`);
+      add('XPath', `locator(${q(`//${tag}[contains(., '${text.slice(0, 24)}')]`)})`);
+    }
+    const xp = xpathOf(el);
+    if (xp) add('XPath', `locator(${q(xp)})`);
+  } else {
+    add('XPath', '— not reachable: this element is inside a shadow root');
+  }
+  return out;
+}
+
+function renderInspector(el){
+  picked = el;
+  const attrs = [...el.attributes].filter(a => !/^(style|draggable)$/.test(a.name))
+    .map(a => `${a.name}="${a.value}"`).join(' ');
+  const shadow = el.getRootNode() !== document;
+  const cands = candidatesFor(el);
+  const groups = ['Recommended', 'CSS', 'XPath'];
+  let html = `<div class="elchip">&lt;<b>${el.tagName.toLowerCase()}</b>${attrs ? ' ' + esc(attrs) : ''}&gt;` +
+    `  ·  role: ${roleOf(el) || 'none'}${shadow ? '  ·  in shadow root' : ''}</div>`;
+  for (const g of groups) {
+    const rows = cands.filter(c => c.group === g);
+    if (!rows.length) continue;
+    html += `<div class="grp">${g}</div><div class="cands">`;
+    rows.forEach((c, i) => {
+      if (c.code.startsWith('—')) { html += `<div class="cand"><code>${esc(c.code)}</code></div>`; return; }
+      const n = countOf(c.code);
+      const cls = n === 1 ? '' : n === 0 || n === -1 ? 'none' : 'many';
+      const badge = n === -1 ? 'error' : n === 1 ? '1 match' : `${n} matches`;
+      html += `<div class="cand ${n === 1 && i === 0 && g === 'Recommended' ? 'best' : ''}">
+        <code>page.${esc(c.code)}</code><span class="n ${cls}">${badge}</span>
+        <button data-act="test">Test</button><button data-act="copy">Copy</button>
+        <button data-act="insert">Insert</button></div>`;
+    });
+    html += '</div>';
+  }
+  inspectOut.innerHTML = html;
+  inspectOut.querySelectorAll('.cand button').forEach(b => b.addEventListener('click', () => {
+    const code = b.closest('.cand').querySelector('code').textContent;
+    if (b.dataset.act === 'copy') { copyText(code); b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 900); }
+    if (b.dataset.act === 'test') { testerInput.value = code; runTester(); }
+    if (b.dataset.act === 'insert') {
+      const snippet = `await ${code}.click();\n`;
+      ta.setRangeText(snippet, ta.selectionStart, ta.selectionEnd, 'end');
+      paint(); b.textContent = 'Inserted'; setTimeout(() => b.textContent = 'Insert', 900);
+      if (isNarrow()) panel('code');
+    }
+  }));
+}
+function copyText(t){
+  if (navigator.clipboard) { navigator.clipboard.writeText(t).catch(() => fallbackCopy(t)); }
+  else fallbackCopy(t);
+}
+function fallbackCopy(t){
+  const x = document.createElement('textarea');
+  x.value = t; document.body.appendChild(x); x.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  x.remove();
+}
+
+/* ---- pick mode ---- */
+const pickBtn = $('#pick');
+function setPicking(on){
+  picking = on;
+  pickBtn.classList.toggle('on', on);
+  pageEl.classList.toggle('picking', on);
+  if (!on) clearVisuals();
+  else { switchTab('inspect'); clearMatches(); }
+}
+pickBtn.addEventListener('click', () => setPicking(!picking));
+function targetOf(e){
+  const path = e.composedPath ? e.composedPath() : [];
+  const el = path.find(n => n.nodeType === 1 && n !== pageEl) || e.target;
+  return pageEl.contains(el) || (el.getRootNode() instanceof ShadowRoot) ? el : null;
+}
+stage.addEventListener('mousemove', e => {
+  if (!picking) return;
+  const el = targetOf(e);
+  if (el && el !== pageEl) placeRing(el, el.tagName.toLowerCase());
+}, true);
+stage.addEventListener('click', e => {
+  if (!picking) return;
+  e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+  const el = targetOf(e);
+  if (!el || el === pageEl) return;
+  setPicking(false);
+  placeRing(el, el.tagName.toLowerCase());
+  renderInspector(el);
+  switchTab('inspect');
+  if (isNarrow()) panel('out');
+}, true);
+
+/* ---- navigate by hand ---- */
+$('#route').addEventListener('change', e => {
+  loadSite(e.target.value);
+  clearMatches(); clearVisuals();
+  inspectOut.innerHTML = '<div class="empty">Page changed. Hit <code>⌖ Pick</code> and click an element.</div>';
+  if (testerInput.value.trim()) runTester();
+});
+
+ta.value = EXAMPLES.login;
+document.body.dataset.panel = 'code';
+paint();
+loadSite('/login');
+pagedot.className = 'dot live';
+</script>
+</body>
+</html>
